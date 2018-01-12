@@ -53,6 +53,7 @@ def test_tag_read_find1():
 	tagger = ReadTagger(['ab'])
 	
 	assert tagger.tag_read('XXabblah') == TaggedRead('XX', 'ab', 'blah', frozenset())
+	assert tagger.tag_read('abblahXX') == TaggedRead(None, 'ab', 'blahXX', frozenset())
 	assert tagger.tag_read('XXbvblah') == TaggedRead(None, None, 'XXbvblah', frozenset())
 	# two occurrences
 	assert tagger.tag_read('XXabblab') == TaggedRead('XX', 'ab', 'blab', frozenset())

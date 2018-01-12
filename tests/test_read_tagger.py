@@ -1,3 +1,5 @@
+from pytest import raises
+
 from bartseq.read_tagger import get_mismatches, ReadTagger, TaggedRead
 
 
@@ -39,6 +41,14 @@ def test_search_barcode():
 	assert [(1, 3, 'ab'), (4, 6, 'ab')] == matches
 
 
+# searches
+
+
+def test_tagger_ambiguous_barcodes():
+	with raises(ValueError, match='ambiguous.*in barcode ab and ac'):
+		ReadTagger(['ab', 'ac'])
+
+
 def test_tag_read_find1():
 	tagger = ReadTagger(['ab'])
 	
@@ -46,6 +56,14 @@ def test_tag_read_find1():
 	assert tagger.tag_read('XXbvblah') == TaggedRead(None, None, 'XXbvblah', frozenset())
 	# two occurrences
 	assert tagger.tag_read('XXabblab') == TaggedRead('XX', 'ab', 'blab', frozenset())
+
+
+def test_tag_read_find_mismatch():
+	tagger = ReadTagger(['ab'])
+	
+	assert tagger.tag_read('XXaGblah') == TaggedRead('XX', 'ab', 'blah', frozenset())
+	# two occurrences
+	assert tagger.tag_read('XXaGblab') == TaggedRead('XX', 'ab', 'blab', frozenset())
 
 
 def test_tag_read_find2():

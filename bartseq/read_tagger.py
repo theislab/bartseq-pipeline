@@ -27,19 +27,29 @@ class TaggedRead(_TaggedReadBase):
 BASES = set('ATGC')
 
 
-def get_mismatches(barcode):
+def get_mismatches(barcode, *, max_mm=1):
 	yield barcode
-	for i in range(len(barcode)):
-		for mismatch in BASES - {barcode[i]}:
-			yield f'{barcode[:i]}{mismatch}{barcode[i+1:]}'
+	if max_mm != 1:
+		raise NotImplemented
+	if max_mm == 1:
+		for i in range(len(barcode)):
+			for mismatch in BASES - {barcode[i]}:
+				yield f'{barcode[:i]}{mismatch}{barcode[i+1:]}'
 
 
 class ReadTagger:
-	def __init__(self, barcodes: Iterable[str]):
+	def __init__(self, barcodes: Iterable[str], *, max_mm=1):
 		self.barcodes = barcodes
 		self.automaton = Automaton()
 		for barcode in barcodes:
-			for pattern in get_mismatches(barcode):
+			for pattern in get_mismatches(barcode, max_mm=max_mm):
+				if pattern in self.automaton:
+					previous_barcode = self.automaton.get(pattern)
+					raise ValueError(
+						'Barcodes with one mismatch are ambiguous: '
+						f'Modification {pattern} encountered in '
+						f'barcode {previous_barcode} and {barcode}'
+					)
 				self.automaton.add_word(pattern, barcode)
 		self.automaton.make_automaton()
 	

@@ -3,7 +3,7 @@ import lzma
 import bz2
 from collections import defaultdict
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union, Optional, Iterable
 
 openers = dict(
 	gz=gzip.open,
@@ -14,15 +14,26 @@ openers = defaultdict(lambda: open, **openers)
 
 
 def transparent_open(
-	filename: Union[Path, str],
+	file: Union[Path, str, Iterable[bytes]],
 	mode: str='rt',
 	*,
 	encoding: Optional[str]=None,
 	errors:   Optional[str]=None,
 	newline:  Optional[str]=None,
 	suffix: str=None
-):
-	filename = Path(filename)
-	
-	suffix = filename.suffix[1:] if suffix is None else suffix
-	return openers[suffix](str(filename), mode, encoding=encoding, errors=errors, newline=newline)
+) -> Iterable[Union[str, bytes]]:
+	"""
+	Open potentially compressed file
+	:param file: File path or file-like object opened in binary mode
+	:param mode: Mode of the returned file
+	:param encoding: Encoding of the text data the file decompresses to (or contains if the file is uncompressed)
+	:param errors: See ``open``
+	:param newline: See ``open``
+	:param suffix: See ``open``
+	:return: File-like object with decompressed data
+	"""
+	if isinstance(file, (str, Path)):
+		path = Path(file)
+		suffix = path.suffix[1:] if suffix is None else suffix
+		file = str(file)
+	return openers[suffix](file, mode, encoding=encoding, errors=errors, newline=newline)

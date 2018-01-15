@@ -1,3 +1,4 @@
+import logging
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Sequence, Callable, Generator, Tuple, Union, Iterable
@@ -9,17 +10,22 @@ import re
 from .read_tagger import ReadTagger
 from .io import transparent_open, openers
 
-
 parser = ArgumentParser()
 parser.add_argument(
 	'in_file', nargs='?', default='-',
 	help='File to read. supported compression: see --in-compression')
 parser.add_argument(
+	'out_file', nargs='?', default='-',
+	help='File to write to. supported compression: see --out-compression')
+parser.add_argument(
 	'--bc-file', '-b', required=True,
 	help='Barcode file in the format ``<ID> <Sequence>`` (with header)')
 parser.add_argument(
-	'--in-compression', '-c', choices=openers.keys(),
-	help='Specify compression if reading from stdin or a file with unusual compression')
+	'--in-compression', '-i', choices=openers.keys(),
+	help='Specify compression if reading from stdin or a file with unusual suffix')
+parser.add_argument(
+	'--out-compression', '-o', choices=openers.keys(),
+	help='Specify compression if writing to stdout or a file with unusual suffix')
 
 
 def main(argv: Sequence[str]=None):
@@ -29,13 +35,17 @@ def main(argv: Sequence[str]=None):
 	args = parser.parse_args(argv)
 	
 	if args.in_file == '-':
-		args.in_file = sys.stdin.buffer
+		args.in_file = sys.stdin
+	if args.out_file == '-':
+		args.out_file = sys.stdout
 	
 	barcodes = {id: bc for id, bc in read_bcs(args.bc_file, get_pred(args.in_file))}
-	print(barcodes)
+	tagger = ReadTagger(barcodes.values())
 	
-	with transparent_open(args.in_file, suffix=args.in_compression) as f_in:
-		tagger = ReadTagger(barcodes.values())
+	with \
+		transparent_open(args.in_file,  'rt', suffix=args.in_compression) as f_in, \
+		transparent_open(args.out_file, 'wt', suffix=args.out_compression) as f_out:
+		
 		for l in f_in:
 			header = l.rstrip('\n')
 			assert header.startswith('@')
@@ -46,10 +56,17 @@ def main(argv: Sequence[str]=None):
 			lj = len(read.junk or [])
 			ljb = lj + len(read.barcode or [])
 			
-			print(header)
-			print(read)
-			print('+')
-			print(qual[:lj] or None, qual[lj:ljb] or None, qual[ljb:] or None)
+			if not read.barcode:
+				continue
+			
+			try:
+				f_out.write(header + '\n')
+				f_out.write(str(read))
+				f_out.write('\n+\n')
+				f_out.write(str([qual[:lj] or None, qual[lj:ljb] or None, qual[ljb:] or None]))
+				f_out.write('\n')
+			except BrokenPipeError:
+				break
 
 
 def read_bcs(filename: str, pred: Callable[[str], bool]) -> Generator[Tuple[str, str], None, None]:

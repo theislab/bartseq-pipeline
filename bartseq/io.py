@@ -36,4 +36,13 @@ def transparent_open(
 		path = Path(file)
 		suffix = path.suffix[1:] if suffix is None else suffix
 		file = str(file)
-	return openers[suffix](file, mode, encoding=encoding, errors=errors, newline=newline)
+	
+	opener = openers[suffix]
+	
+	if not isinstance(file, str) and opener is open:
+		return file
+	else:
+		try:
+			return opener(file, mode, encoding=encoding, errors=errors, newline=newline)
+		except TypeError as e:
+			raise TypeError(f'Error in opener {opener}') from e

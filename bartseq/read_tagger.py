@@ -3,6 +3,8 @@ from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator
 
 from ahocorasick import Automaton
 
+from .logging import log
+
 
 LEN_PRIMER = NotImplemented
 
@@ -37,20 +39,34 @@ def get_mismatches(barcode: str, *, max_mm: int=1) -> Generator[str, None, None]
 				yield f'{barcode[:i]}{mismatch}{barcode[i+1:]}'
 
 
+def get_all_barcodes(barcodes: Iterable[str], *, max_mm: int=1):
+	found = {}
+	blacklist = set()
+	
+	for barcode in barcodes:
+		for pattern in get_mismatches(barcode, max_mm=max_mm):
+			previous_barcode = found.get(pattern)
+			if previous_barcode:
+				blacklist.add(pattern)
+				log.warning(
+					'Barcodes with one mismatch are ambiguous: '
+					f'Modification {pattern} encountered in '
+					f'barcode {previous_barcode} and {barcode}'
+				)
+			found[pattern] = barcode
+	
+	for pattern in blacklist:
+		del found[pattern]
+	
+	return found
+
+
 class ReadTagger:
 	def __init__(self, barcodes: Iterable[str], *, max_mm: int=1):
 		self.barcodes = barcodes
 		self.automaton = Automaton()
-		for barcode in barcodes:
-			for pattern in get_mismatches(barcode, max_mm=max_mm):
-				if pattern in self.automaton:
-					previous_barcode = self.automaton.get(pattern)
-					raise ValueError(
-						'Barcodes with one mismatch are ambiguous: '
-						f'Modification {pattern} encountered in '
-						f'barcode {previous_barcode} and {barcode}'
-					)
-				self.automaton.add_word(pattern, barcode)
+		for pattern, barcode in get_all_barcodes(barcodes, max_mm=max_mm).items():
+			self.automaton.add_word(pattern, barcode)
 		self.automaton.make_automaton()
 	
 	def search_barcode(self, read: str) -> Tuple[int, int, str]:

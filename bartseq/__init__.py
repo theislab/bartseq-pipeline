@@ -1,5 +1,6 @@
+import json
 from argparse import ArgumentParser
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from pathlib import Path
 from textwrap import dedent
 from typing import Sequence, Generator, Tuple, Pattern
@@ -17,10 +18,13 @@ from .logging import log, init_logging
 parser = ArgumentParser()
 parser.add_argument(
 	'in_file', nargs='?', default='-',
-	help='File to read. supported compression: see --in-compression')
+	help='File to read. Supported compression: see --in-compression')
 parser.add_argument(
 	'out_file', nargs='?', default='-',
-	help='File to write to. supported compression: see --out-compression')
+	help='File to write to. If it contains “{}”, demultiplexing is used. Supported compression: see --out-compression')
+parser.add_argument(
+	'--stats-file', '-s', nargs='?', default='-',
+	help='File to write final stats to (in JSON format)')
 parser.add_argument(
 	'--bc-file', '-b', required=True,
 	help='Barcode file in the format ``<ID> <Sequence>`` (with header)')
@@ -60,11 +64,13 @@ def main(argv: Sequence[str]=None):
 		args.in_file = sys.stdin
 	if args.out_file == '-':
 		args.out_file = sys.stdout
+		multiple_outputs = False
 	else:
 		Path(args.out_file).parent.mkdir(parents=True, exist_ok=True)
+		multiple_outputs = '{}' in args.out_file
 	
 	barcodes = {id_: bc for id_, bc in read_bcs(args.bc_file, args.bc_id_pat)}
-	log.info(f'Using barcodes:\n{barcodes}')
+	log.info(f'Using barcodes: {barcodes}')
 	tagger = ReadTagger(barcodes.values(), args.len_linker)
 	
 	stats = dict(
@@ -75,9 +81,18 @@ def main(argv: Sequence[str]=None):
 		n_junk=0,
 	)
 	
-	with tqdm(total=args.total) if args.total != 0 else ctx_dummy() as pb, \
+	with tqdm(total=args.total*4) if args.total != 0 else ctx_dummy() as pb, \
 		transparent_open(args.in_file,  'rt', suffix=args.in_compression) as f_in, \
-		transparent_open(args.out_file, 'wt', suffix=args.out_compression) as f_out:
+		ExitStack() as stack:
+		
+		fs_out = {}
+		
+		if multiple_outputs:
+			fs_out[None] = transparent_open(args.out_file.format('unmapped'), 'wt', suffix=args.out_compression)
+			for bc in barcodes.values():
+				fs_out[bc] = transparent_open(args.out_file.format(bc), 'wt', suffix=args.out_compression)
+		else:
+			fs_out[None] = transparent_open(args.out_file, 'wt', suffix=args.out_compression)
 		
 		for l, line in enumerate(f_in):
 			header = line.rstrip('\n')
@@ -103,6 +118,7 @@ def main(argv: Sequence[str]=None):
 				f'junk={read.junk}',
 			])
 			
+			f_out = fs_out[read.barcode if multiple_outputs else None]
 			try:
 				f_out.write(dedent(f'''\
 					{header} {tagline}
@@ -118,6 +134,9 @@ def main(argv: Sequence[str]=None):
 				break
 		
 		if pb: pb.close()
+	
+	with transparent_open(args.stats_file, 'wt') as f_s:
+		json.dump(stats, f_s)
 
 
 def read_bcs(filename: str, id_pat: Pattern) -> Generator[Tuple[str, str], None, None]:

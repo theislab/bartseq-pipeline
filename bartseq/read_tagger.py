@@ -6,9 +6,6 @@ from ahocorasick import Automaton
 from .logging import log
 
 
-LEN_PRIMER = NotImplemented
-
-
 _TaggedReadBase = NamedTuple('_TaggedReadBase', [
 	('junk', Optional[str]),
 	('barcode', Optional[str]),
@@ -21,9 +18,8 @@ class TaggedRead(_TaggedReadBase):
 	def has_multiple_barcodes(self):
 		return len(self.other_barcodes) > 0
 	
-	@property
-	def is_just_primer(self):
-		return self.barcode is not None and len(self.amplicon) > LEN_PRIMER
+	def is_just_primer(self, len_primer):
+		return self.barcode is not None and len(self.amplicon) > len_primer
 
 
 BASES = set('ATGC')

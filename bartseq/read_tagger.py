@@ -19,7 +19,7 @@ class TaggedRead(_TaggedReadBase):
 		return len(self.other_barcodes) > 0
 	
 	def is_just_primer(self, len_primer):
-		return self.barcode is not None and len(self.amplicon) > len_primer
+		return self.barcode is not None and len(self.amplicon) <= len_primer
 
 
 BASES = set('ATGC')

@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator
+from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, Iterator, Union
 
 from ahocorasick import Automaton
 
@@ -9,6 +9,7 @@ from .logging import log
 _TaggedReadBase = NamedTuple('_TaggedReadBase', [
 	('junk', Optional[str]),
 	('barcode', Optional[str]),
+	('linker', Optional[str]),
 	('amplicon', str),
 	('other_barcodes', FrozenSet[str]),
 ])
@@ -20,6 +21,11 @@ class TaggedRead(_TaggedReadBase):
 	
 	def is_just_primer(self, len_primer):
 		return self.barcode is not None and len(self.amplicon) <= len_primer
+	
+	def cut_seq(self, seq):
+		ljb = len(self.junk or []) + len(self.barcode or [])
+		ljba = ljb + len(self.amplicon or [])
+		return seq[ljb:ljba]
 
 
 BASES = set('ATGC')
@@ -58,8 +64,9 @@ def get_all_barcodes(barcodes: Iterable[str], *, max_mm: int=1):
 
 
 class ReadTagger:
-	def __init__(self, barcodes: Iterable[str], *, max_mm: int=1):
+	def __init__(self, barcodes: Iterable[str], len_linker: int, *, max_mm: int=1):
 		self.barcodes = barcodes
+		self.len_linker = len_linker
 		self.automaton = Automaton()
 		for pattern, barcode in get_all_barcodes(barcodes, max_mm=max_mm).items():
 			self.automaton.add_word(pattern, barcode)
@@ -74,11 +81,19 @@ class ReadTagger:
 		# as ordered set
 		matches = OrderedDict((match, None) for match in self.search_barcode(read))
 		
-		match_iter = iter(matches)
+		match_iter = iter(matches)  # type: Iterator[Tuple[int, int, str]]
 		bc_start, bc_end, barcode = next(match_iter, (None, None, None))
 		other_barcodes = frozenset(set(bc for _, _, bc in match_iter) - {barcode})
 		
-		junk = read[:bc_start] if bc_start else None
-		amplicon = read[bc_end:] if bc_end else read
+		if barcode is not None:
+			linker_end = bc_end + self.len_linker if bc_end else None
+			
+			junk = read[:bc_start] or None
+			linker = read[bc_end:linker_end]
+			amplicon = read[linker_end:]
+		else:
+			junk = None
+			linker = None
+			amplicon = read
 		# TODO: no amplicon if only primer
-		return TaggedRead(junk, barcode, amplicon, other_barcodes)
+		return TaggedRead(junk, barcode, linker, amplicon, other_barcodes)

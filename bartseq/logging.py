@@ -1,3 +1,13 @@
-import logging
+from logging import (
+	Logger, basicConfig,
+	DEBUG, INFO, WARNING, ERROR, CRITICAL,
+)
 
-log = logging.Logger(__name__)
+import sys
+
+log = Logger(__name__)
+
+
+def init_logging():
+	basicConfig(level=INFO, stream=sys.stderr)
+	assert log.isEnabledFor(INFO)

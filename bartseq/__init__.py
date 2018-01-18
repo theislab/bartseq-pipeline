@@ -1,7 +1,8 @@
 from argparse import ArgumentParser
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Sequence, Callable, Generator, Tuple, Union, Iterable
+from textwrap import dedent
+from typing import Sequence, Generator, Tuple, Pattern
 
 import sys
 
@@ -11,6 +12,7 @@ from tqdm import tqdm
 
 from .read_tagger import ReadTagger, BASES
 from .io import transparent_open, openers
+from .logging import log, init_logging
 
 parser = ArgumentParser()
 parser.add_argument(
@@ -23,11 +25,17 @@ parser.add_argument(
 	'--bc-file', '-b', required=True,
 	help='Barcode file in the format ``<ID> <Sequence>`` (with header)')
 parser.add_argument(
+	'--bc-id-pat', '-r', type=re.compile, required=True,
+	help='Barcode ID regex. e.g. ``L\d+`` for left barcodes')
+parser.add_argument(
 	'--total', '-t', type=int, default=0,
 	help='Number of fastq records in file. “0” means no progressbar')
 parser.add_argument(
-	'--len-primer', '-p', type=int, default=22,
+	'--len-primer', '-p', type=int, default=27,
 	help='Primer length for stats')
+parser.add_argument(
+	'--len-linker', '-l', type=int, default=10,
+	help='Linker length to cut out')
 parser.add_argument(
 	'--in-compression', '-i', choices=openers.keys(),
 	help='Specify compression if reading from stdin or a file with unusual suffix')
@@ -42,6 +50,7 @@ def ctx_dummy():
 
 
 def main(argv: Sequence[str]=None):
+	init_logging()
 	if argv is None:
 		argv = sys.argv[1:]
 	
@@ -51,64 +60,71 @@ def main(argv: Sequence[str]=None):
 		args.in_file = sys.stdin
 	if args.out_file == '-':
 		args.out_file = sys.stdout
+	else:
+		Path(args.out_file).parent.mkdir(parents=True, exist_ok=True)
 	
-	barcodes = {id: bc for id, bc in read_bcs(args.bc_file, get_pred(args.in_file))}
-	tagger = ReadTagger(barcodes.values())
+	barcodes = {id_: bc for id_, bc in read_bcs(args.bc_file, args.bc_id_pat)}
+	log.info(f'Using barcodes:\n{barcodes}')
+	tagger = ReadTagger(barcodes.values(), args.len_linker)
+	
+	stats = dict(
+		n_only_primer=0,
+		n_multiple_bcs=0,
+		n_no_barcode=0,
+		n_regular=0,
+		n_junk=0,
+	)
 	
 	with tqdm(total=args.total) if args.total != 0 else ctx_dummy() as pb, \
 		transparent_open(args.in_file,  'rt', suffix=args.in_compression) as f_in, \
 		transparent_open(args.out_file, 'wt', suffix=args.out_compression) as f_out:
 		
-		for l in f_in:
-			header = l.rstrip('\n')
+		for l, line in enumerate(f_in):
+			header = line.rstrip('\n')
 			assert header.startswith('@')
 			read = tagger.tag_read(next(f_in).rstrip('\n'))
 			assert next(f_in).startswith('+')
-			qual = next(f_in).rstrip('\n')
+			qual = read.cut_seq(next(f_in))
 			
-			ljb = len(read.junk or []) + len(read.barcode or [])
-			ljba = ljb + len(read.amplicon or [])
+			is_primer = read.is_just_primer(args.len_primer)
+			
+			if is_primer:                      stats['n_only_primer'] += 1
+			if read.has_multiple_barcodes:     stats['n_multiple_bcs'] += 1
+			if not read.barcode:               stats['n_no_barcode'] += 1
+			if read.junk:                      stats['n_junk'] += 1
+			if read.barcode and not is_primer: stats['n_regular'] += 1
+			
+			tagline = ' '.join([
+				f'barcode={read.barcode}',
+				f'linker={read.linker}',
+				f'multi-bc={read.has_multiple_barcodes}',
+				f'just-primer={is_primer}',
+				f'other-bcs={",".join(read.other_barcodes) or None}',
+				f'junk={read.junk}',
+			])
 			
 			try:
-				f_out.write(f'''\
-{header} barcode={read.barcode} \
-multi-bc={read.has_multiple_barcodes} \
-just-primer={read.is_just_primer(args.len_primer)} \
-other-bcs={",".join(read.other_barcodes) or None} \
-junk={read.junk}
-{read.amplicon}
-+
-{qual[ljb:ljba]}
-''')
-				if pb: pb.update(1)
+				f_out.write(dedent(f'''\
+					{header} {tagline}
+					{read.amplicon}
+					+
+					{qual}
+				'''))
+				if pb:
+					pb.update(1)
+					if l % 10000 == 0:
+						pb.set_description(', '.join(f'{k}: {v}' for k, v in stats.items()))
 			except BrokenPipeError:
 				break
 		
 		if pb: pb.close()
 
 
-def read_bcs(filename: str, pred: Callable[[str], bool]) -> Generator[Tuple[str, str], None, None]:
+def read_bcs(filename: str, id_pat: Pattern) -> Generator[Tuple[str, str], None, None]:
 	with open(filename) as f_bc:
 		header = next(f_bc)
 		assert not all(c in BASES for field in header.split(' ') for c in field)
 		for l in f_bc:
 			id_, bc = l.rstrip('\n').split('\t')
-			if pred(id_):
+			if id_pat.match(id_):
 				yield id_, bc
-
-
-def get_pred(filename: Union[Path, str, Iterable[str]]) -> Callable[[str], bool]:
-	def pred(_):
-		return True
-	
-	if not isinstance(filename, (Path, str)):
-		return pred
-	
-	read = next(iter(re.finditer(r'_R(\d)_', str(filename))), None)
-	if read:
-		side = 'L' if read.group(1) == '1' else 'R'
-		
-		def pred(id_):
-			return id_.startswith(side)
-	
-	return pred

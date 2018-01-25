@@ -3,7 +3,7 @@ import lzma
 import bz2
 from collections import defaultdict
 from pathlib import Path
-from typing import Union, Optional, Iterable
+from typing import Union, Optional, Iterable, Tuple, Generator
 
 openers = dict(
 	gz=gzip.open,
@@ -46,3 +46,18 @@ def transparent_open(
 			return opener(file, mode, encoding=encoding, errors=errors, newline=newline)
 		except TypeError as e:
 			raise TypeError(f'Error in opener {opener}') from e
+
+
+def parse_fq(line_header: str, line_seq: str, line_plus: str, line_qual: str) -> Tuple[str, str, str]:
+	header = line_header.rstrip('\n')
+	assert header.startswith('@')
+	seq_read = line_seq.rstrip('\n')
+	assert line_plus.startswith('+')
+	seq_qual = line_qual.rstrip('\n')
+	return header, seq_read, seq_qual
+
+
+def iter_fq(lines: Iterable[str]) -> Generator[Tuple[str, str, str], None, None]:
+	line_it = iter(lines)
+	while True:
+		yield parse_fq(next(line_it), next(line_it), next(line_it), next(line_it))

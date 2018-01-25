@@ -12,7 +12,7 @@ import re
 from tqdm import tqdm
 
 from .read_tagger import ReadTagger, BASES
-from .io import transparent_open, openers
+from .io import transparent_open, openers, iter_fq
 from .logging import log, init_logging
 
 parser = ArgumentParser()
@@ -21,7 +21,7 @@ parser.add_argument(
 	help='File to read. Supported compression: see --in-compression')
 parser.add_argument(
 	'out_file', nargs='?', default='-',
-	help='File to write to. If it contains “{}”, demultiplexing is used. Supported compression: see --out-compression')
+	help='File to write to. Supported compression: see --out-compression')
 parser.add_argument(
 	'--stats-file', '-s', nargs='?', default='-',
 	help='File to write final stats to (in JSON format)')
@@ -49,7 +49,7 @@ parser.add_argument(
 
 
 @contextmanager
-def ctx_dummy():
+def ctx_dummy() -> Generator[None, None, None]:
 	yield None
 
 
@@ -64,79 +64,35 @@ def main(argv: Sequence[str]=None):
 		args.in_file = sys.stdin
 	if args.out_file == '-':
 		args.out_file = sys.stdout
-		multiple_outputs = False
 	else:
 		Path(args.out_file).parent.mkdir(parents=True, exist_ok=True)
-		multiple_outputs = '{}' in args.out_file
 	
-	barcodes = {id_: bc for id_, bc in read_bcs(args.bc_file, args.bc_id_pat)}
-	log.info(f'Using barcodes: {barcodes}')
-	tagger = ReadTagger(barcodes.values(), args.len_linker)
-	
-	stats = dict(
-		n_only_primer=0,
-		n_multiple_bcs=0,
-		n_no_barcode=0,
-		n_regular=0,
-		n_junk=0,
-	)
+	id_to_bc = {id_: bc for id_, bc in read_bcs(args.bc_file, args.bc_id_pat)}
+	bc_to_id = {bc: id_ for id_, bc in id_to_bc.items()}
+	log.info(f'Using barcodes: {id_to_bc}')
+	tagger = ReadTagger(bc_to_id.keys(), args.len_linker, args.len_primer)
 	
 	with tqdm(total=args.total*4) if args.total != 0 else ctx_dummy() as pb, \
 		transparent_open(args.in_file,  'rt', suffix=args.in_compression) as f_in, \
-		ExitStack() as stack:
+		transparent_open(args.out_file, 'wt', suffix=args.out_compression) as f_out:
 		
-		fs_out = {}
-		
-		if multiple_outputs:
-			fs_out[None] = transparent_open(args.out_file.format('unmapped'), 'wt', suffix=args.out_compression)
-			for bc in barcodes.values():
-				fs_out[bc] = transparent_open(args.out_file.format(bc), 'wt', suffix=args.out_compression)
-		else:
-			fs_out[None] = transparent_open(args.out_file, 'wt', suffix=args.out_compression)
-		
-		for l, line in enumerate(f_in):
-			header = line.rstrip('\n')
-			assert header.startswith('@')
-			read = tagger.tag_read(next(f_in).rstrip('\n'))
-			assert next(f_in).startswith('+')
-			qual = read.cut_seq(next(f_in))
+		for l, (header, seq_read, seq_qual) in enumerate(iter_fq(f_in)):
+			read = tagger.tag_read(header, seq_read, seq_qual)
 			
-			is_primer = read.is_just_primer(args.len_primer)
-			
-			if is_primer:                      stats['n_only_primer'] += 1
-			if read.has_multiple_barcodes:     stats['n_multiple_bcs'] += 1
-			if not read.barcode:               stats['n_no_barcode'] += 1
-			if read.junk:                      stats['n_junk'] += 1
-			if read.barcode and not is_primer: stats['n_regular'] += 1
-			
-			tagline = ' '.join([
-				f'barcode={read.barcode}',
-				f'linker={read.linker}',
-				f'multi-bc={read.has_multiple_barcodes}',
-				f'just-primer={is_primer}',
-				f'other-bcs={",".join(read.other_barcodes) or None}',
-				f'junk={read.junk}',
-			])
-			
-			f_out = fs_out[read.barcode if multiple_outputs else None]
 			try:
-				f_out.write(dedent(f'''\
-					{header} {tagline}
-					{read.amplicon}
-					+
-					{qual}
-				'''))
-				if pb:
-					pb.update(1)
-					if l % 10000 == 0:
-						pb.set_description(', '.join(f'{k}: {v}' for k, v in stats.items()))
+				f_out.write(str(read))
 			except BrokenPipeError:
 				break
+			
+			if pb:
+				pb.update(1)
+				if l % 10000 == 0:
+					pb.set_description(', '.join(f'{k}: {v}' for k, v in tagger.stats.items()), refresh=False)
 		
 		if pb: pb.close()
 	
 	with transparent_open(args.stats_file, 'wt') as f_s:
-		json.dump(stats, f_s)
+		json.dump(tagger.stats, f_s)
 
 
 def read_bcs(filename: str, id_pat: Pattern) -> Generator[Tuple[str, str], None, None]:

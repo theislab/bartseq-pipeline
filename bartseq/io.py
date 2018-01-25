@@ -3,7 +3,9 @@ import lzma
 import bz2
 from collections import defaultdict
 from pathlib import Path
-from typing import Union, Optional, Iterable, Tuple, Generator
+from typing import Union, Optional, Iterable, Tuple, Generator, Pattern
+
+from bartseq import BASES
 
 openers = dict(
 	gz=gzip.open,
@@ -61,3 +63,12 @@ def iter_fq(lines: Iterable[str]) -> Generator[Tuple[str, str, str], None, None]
 	line_it = iter(lines)
 	while True:
 		yield parse_fq(next(line_it), next(line_it), next(line_it), next(line_it))
+
+
+def read_bcs(filename: str) -> Generator[Tuple[str, str], None, None]:
+	with open(filename) as f_bc:
+		header = next(f_bc)
+		assert not all(c in BASES for field in header.split(' ') for c in field)
+		for l in f_bc:
+			id_, bc = l.rstrip('\n').split('\t')
+			yield id_, bc

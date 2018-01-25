@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, Iterator, Union
+from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, Iterator, Union, Dict
 
 from ahocorasick import Automaton
 
@@ -84,8 +84,8 @@ def get_all_barcodes(barcodes: Iterable[str], *, max_mm: int=1):
 
 
 class ReadTagger:
-	def __init__(self, barcodes: Iterable[str], len_linker: int, len_primer: int, *, max_mm: int=1, use_stats: bool=True):
-		self.barcodes = barcodes
+	def __init__(self, bc_to_id: Dict[str, str], len_linker: int, len_primer: int, *, max_mm: int=1, use_stats: bool=True):
+		self.bc_to_id = bc_to_id
 		self.len_linker = len_linker
 		self.len_primer = len_primer
 		self.stats = None if not use_stats else dict(
@@ -98,7 +98,7 @@ class ReadTagger:
 		)
 		
 		self.automaton = Automaton()
-		for pattern, barcode in get_all_barcodes(barcodes, max_mm=max_mm).items():
+		for pattern, barcode in get_all_barcodes(bc_to_id.keys(), max_mm=max_mm).items():
 			self.automaton.add_word(pattern, barcode)
 		self.automaton.make_automaton()
 	
@@ -128,7 +128,7 @@ class ReadTagger:
 			amplicon = seq_read
 			barcode_mismatch = False
 		
-		read = TaggedRead(header, seq_qual, self.len_primer, junk, barcode, linker, amplicon, other_barcodes, barcode_mismatch)
+		read = TaggedRead(header, seq_qual, self.len_primer, junk, self.bc_to_id.get(barcode, None), linker, amplicon, other_barcodes, barcode_mismatch)
 		
 		if self.stats is not None:
 			if read.is_just_primer:        self.stats['n_only_primer'] += 1

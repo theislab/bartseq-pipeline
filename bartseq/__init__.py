@@ -109,7 +109,7 @@ def main(argv: Sequence[str]=None):
 		stats = dict(read1=tagger1.stats, n_reads=n_reads)
 		if has_two_reads:
 			stats['read2'] = tagger2.stats
-		json.dump(stats, f_s)
+		json.dump(stats, f_s, indent='\t')
 
 
 def parse_args(argv: Sequence[str]=None) -> Union[Namespace, Any]:

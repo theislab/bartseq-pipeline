@@ -4,7 +4,7 @@ import re
 from argparse import ArgumentParser, ArgumentError, Namespace
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Generator, Sequence, Union, Tuple, Iterable, Pattern
+from typing import Any, Generator, Sequence, Union, Tuple, Iterable, Pattern, Optional
 
 from tqdm import tqdm
 
@@ -69,12 +69,6 @@ def main(argv: Sequence[str]=None):
 		transparent_open(args.in_2,  'rt', suffix=args.in_compression)  if has_two_reads else ctx_dummy() as f_in_2, \
 		transparent_open(args.out_2, 'wt', suffix=args.out_compression) if has_two_reads else ctx_dummy() as f_out_2:
 		
-		def update_pb(tgr, i):
-			if not pb: return
-			pb.update(1)
-			if i % 10000 == 0:
-				pb.set_description(', '.join(f'{k}: {v}' for k, v in tgr.stats.items()), refresh=False)
-		
 		n_reads = 0
 		if has_two_reads:
 			for r, (parts1, parts2) in enumerate(zip(iter_fq(f_in_1), iter_fq(f_in_2))):
@@ -88,7 +82,7 @@ def main(argv: Sequence[str]=None):
 				except BrokenPipeError:
 					break
 				
-				update_pb(tagger1, r)
+				update_pb(pb, tagger1, r)
 				n_reads = r
 				# TODO: maybe both?
 		else:
@@ -100,13 +94,13 @@ def main(argv: Sequence[str]=None):
 				except BrokenPipeError:
 					break
 				
-				update_pb(tagger1, r)
+				update_pb(pb, tagger1, r)
 				n_reads = r
 		
 		if pb: pb.close()
 	
 	with transparent_open(args.stats_file, 'wt') as f_s:
-		stats = dict(read1=tagger1.stats, n_reads=n_reads)
+		stats = dict(n_reads=n_reads, read1=tagger1.stats)
 		if has_two_reads:
 			stats['read2'] = tagger2.stats
 		json.dump(stats, f_s, indent='\t')
@@ -140,6 +134,13 @@ def get_tagger(r: int, bcs_all: Iterable[Tuple[str, str]], pat: Pattern, len_lin
 	bc_to_id = {bc: id_ for id_, bc in bcs_all if pat.match(id_)}
 	log.info(f'Using read {r} barcodes: {bc_to_id}')
 	return ReadTagger(bc_to_id, len_linker, len_primer)
+
+
+def update_pb(pb: Optional[tqdm], tgr: ReadTagger, i: int):
+	if not pb: return
+	pb.update(1)
+	if i % 10000 == 0:
+		pb.set_description(', '.join(f'{k}: {v}' for k, v in tgr.stats.items()), refresh=False)
 
 
 @contextmanager

@@ -1,7 +1,8 @@
 from collections import OrderedDict
-from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, Iterator, Union, Dict
+from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, Iterator, Dict, List, Set
 
 from ahocorasick import Automaton
+import pandas as pd
 
 from .logging import log
 
@@ -26,6 +27,10 @@ class TaggedRead(_TaggedReadBase):
 	@property
 	def is_just_primer(self):
 		return self.barcode is not None and len(self.amplicon) <= self.len_primer
+	
+	@property
+	def is_regular(self):
+		return self.barcode and not self.is_just_primer
 	
 	def cut_seq(self, seq):
 		ljb = len(self.junk or []) + len(self.barcode or [])
@@ -61,15 +66,17 @@ def get_mismatches(barcode: str, *, max_mm: int=1) -> Generator[str, None, None]
 				yield f'{barcode[:i]}{mismatch}{barcode[i+1:]}'
 
 
-def get_all_barcodes(barcodes: Iterable[str], *, max_mm: int=1):
+def get_all_barcodes(barcodes: Iterable[str], *, max_mm: int=1) -> Tuple[Dict[str, str], Dict[str, Set[Tuple[str, str]]]]:
 	found = {}
-	blacklist = set()
+	blacklist = {}
 	
 	for barcode in barcodes:
 		for pattern in get_mismatches(barcode, max_mm=max_mm):
 			previous_barcode = found.get(pattern)
 			if previous_barcode:
-				blacklist.add(pattern)
+				bl_item = blacklist.setdefault(pattern, set())
+				bl_item.add((previous_barcode, barcode))
+				bl_item.add((barcode, previous_barcode))
 				log.warning(
 					'Barcodes with one mismatch are ambiguous: '
 					f'Modification {pattern} encountered in '
@@ -80,7 +87,7 @@ def get_all_barcodes(barcodes: Iterable[str], *, max_mm: int=1):
 	for pattern in blacklist:
 		del found[pattern]
 	
-	return found
+	return found, blacklist
 
 
 class ReadTagger:
@@ -98,7 +105,8 @@ class ReadTagger:
 		)
 		
 		self.automaton = Automaton()
-		for pattern, barcode in get_all_barcodes(bc_to_id.keys(), max_mm=max_mm).items():
+		all_barcodes, self.blacklist = get_all_barcodes(bc_to_id.keys(), max_mm=max_mm)
+		for pattern, barcode in all_barcodes.items():
 			self.automaton.add_word(pattern, barcode)
 		self.automaton.make_automaton()
 	
@@ -136,6 +144,47 @@ class ReadTagger:
 			if not read.barcode:           self.stats['n_no_barcode'] += 1
 			if read.barcode_mismatch:      self.stats['n_barcode_mismatch'] += 1
 			if read.junk:                  self.stats['n_junk'] += 1
-			if read.barcode and not read.is_just_primer: self.stats['n_regular'] += 1
+			if read.is_regular:            self.stats['n_regular'] += 1
 		
 		return read
+	
+	def get_barcode_table(self):
+		cell_templates = {
+			(True, True): '{}',
+			(True, False): '<span class="b">{}</span>',
+			(False, True): '<span class="a">{}</span>',
+			(False, False): '<span class="both">{}</span>',
+		}
+		
+		patterns = sorted({bc for bc_pairs in self.blacklist.values() for pair in bc_pairs for bc in pair})
+		sprs = pd.DataFrame(index=patterns, columns=patterns, dtype=str)
+		for pattern, bc_pairs in self.blacklist.items():
+			for bc1, bc2 in bc_pairs:
+				sprs.loc[bc1, bc2] = ''.join(
+					cell_templates[bc1[i] == base, bc2[i] == base].format(base)
+					for i, base in enumerate(pattern)
+				)
+		
+		with pd.option_context('display.max_colwidth', -1):
+			html = sprs.to_html(escape=False, na_rep='')
+		
+		return f'''\
+<!doctype html>
+<meta charset="utf-8">
+<style>
+body  {{ font-size: 12px }}
+table {{ border-collapse: collapse }}
+th:empty,
+table {{ border: none }}
+th, td {{ border: 1px solid rgba(0,0,0,.2); padding: 5px }}
+thead, tbody th {{ position: sticky }}
+
+thead th,
+.a    {{ color: #FF6AD5 }}
+tbody th,
+.b    {{ color: #AD8CFF }}
+td    {{ color: #94D0FF }}
+.both {{ color: red }}
+</style>
+{html}
+'''

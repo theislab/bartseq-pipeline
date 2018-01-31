@@ -1,10 +1,9 @@
 import json
 import sys
-import re
 from argparse import ArgumentParser, ArgumentError, Namespace
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Generator, Sequence, Union, Tuple, Iterable, Pattern, Optional
+from typing import Any, Generator, Sequence, Union, Tuple, Iterable, Optional
 
 from tqdm import tqdm
 
@@ -32,11 +31,8 @@ parser.add_argument(
 	'--bc-file', '-b', required=True,
 	help='Barcode file in the format ``<ID> <Sequence>`` (with header)')
 parser.add_argument(
-	'--bc-id-pat1', type=re.compile, default=re.compile(r'L\d+'),
-	help='Read 1 Barcode ID regex. Default: ``L\d+`` for left barcodes')
-parser.add_argument(
-	'--bc-id-pat2', type=re.compile, default=re.compile(r'R\d+'),
-	help='Read 2 Barcode ID regex. Default: ``R\d+`` for left barcodes')
+	'--bc-table', '-B', nargs='?',
+	help='File name for the HTML table of barcode mismatches')
 parser.add_argument(
 	'--total', '-t', type=int, default=0,
 	help='Number of fastq records in file. “0” means no progressbar')
@@ -60,8 +56,13 @@ def main(argv: Sequence[str]=None):
 	has_two_reads = bool(args.in_2)
 	bcs_all = list(read_bcs(args.bc_file))
 	
-	tagger1 = get_tagger(1, bcs_all, args.bc_id_pat1, args.len_linker, args.len_primer)
-	tagger2 = get_tagger(2, bcs_all, args.bc_id_pat2, args.len_linker, args.len_primer) if has_two_reads else None
+	# Two taggers to get two sets of statistics
+	tagger1 = get_tagger(bcs_all, args.len_linker, args.len_primer)
+	tagger2 = get_tagger(bcs_all, args.len_linker, args.len_primer) if has_two_reads else None
+	
+	if args.bc_table:
+		with transparent_open(args.bc_table, 'wt') as f_bc:
+			f_bc.write(tagger1.get_barcode_table())
 	
 	with tqdm(total=args.total) if args.total != 0 else ctx_dummy() as pb, \
 		transparent_open(args.in_1,  'rt', suffix=args.in_compression)  as f_in_1, \
@@ -76,7 +77,7 @@ def main(argv: Sequence[str]=None):
 				read2 = tagger2.tag_read(*parts2)
 				
 				try:
-					if read1.barcode and read2.barcode:
+					if read1.is_regular and read2.is_regular:
 						f_out_1.write(str(read1))
 						f_out_2.write(str(read2))
 				except BrokenPipeError:
@@ -130,9 +131,8 @@ def parse_args(argv: Sequence[str]=None) -> Union[Namespace, Any]:
 	return args
 
 
-def get_tagger(r: int, bcs_all: Iterable[Tuple[str, str]], pat: Pattern, len_linker: int, len_primer: int):
-	bc_to_id = {bc: id_ for id_, bc in bcs_all if pat.match(id_)}
-	log.info(f'Using read {r} barcodes: {bc_to_id}')
+def get_tagger(id_to_bc: Iterable[Tuple[str, str]], len_linker: int, len_primer: int):
+	bc_to_id = {bc: id_ for id_, bc in id_to_bc}
 	return ReadTagger(bc_to_id, len_linker, len_primer)
 
 

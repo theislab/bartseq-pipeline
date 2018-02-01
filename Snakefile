@@ -75,6 +75,7 @@ rule tag_reads:
 			stats_file=output.stats_file,
 		)
 
+#Needs https://bitbucket.org/snakemake/snakemake/pull-requests/264
 rule dag:
 	shell:
 		'snakemake -s {__file__} --dag | dot -Tsvg | gwenview /dev/stdin'

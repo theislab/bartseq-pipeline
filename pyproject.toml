@@ -1,0 +1,25 @@
+[build-system]
+requires=['flit']
+build-backend='flit.buildapi'
+
+[tool.flit.metadata]
+module='bartseq'
+author='Philipp Angerer'
+author-email='philipp.angerer@helmholtz-muenchen.de'
+home-page='https://www.helmholtz-muenchen.de/icb/bartseq'
+requires = [
+	'snakemake>=4.5.1',
+	'pandas',
+	'pyahocorasick',
+]
+requires-python='3'
+description-file='README.rst'
+classifiers=[
+	'Intended Audience :: Science/Research',
+	'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+	'Programming Language :: Python :: 3',
+	'Topic :: Scientific/Engineering :: Bio-Informatics',
+]
+
+[tool.flit.scripts]
+bartseq = 'bartseq.cli:run_cli'

@@ -1,11 +1,12 @@
 import gzip
+import json
 import lzma
 import bz2
 from collections import defaultdict
 from pathlib import Path
-from typing import Union, Optional, Iterable, Tuple, Generator, Pattern
+from typing import Union, Optional, Iterable, Tuple, Generator
 
-from bartseq import BASES
+from . import BASES
 
 openers = dict(
 	gz=gzip.open,
@@ -65,10 +66,26 @@ def iter_fq(lines: Iterable[str]) -> Generator[Tuple[str, str, str], None, None]
 		yield parse_fq(next(line_it), next(line_it), next(line_it), next(line_it))
 
 
-def read_bcs(filename: str) -> Generator[Tuple[str, str], None, None]:
+def read_bcs(filename: Union[Path, str]) -> Generator[Tuple[str, str], None, None]:
 	with open(filename) as f_bc:
 		header = next(f_bc)
 		assert not all(c in BASES for field in header.split(' ') for c in field)
 		for l in f_bc:
 			id_, bc = l.rstrip('\n').split('\t')
 			yield id_, bc
+
+
+def write_bc_table(path_bc_file: Union[Path, str], path_bc_table: Union[Path, str]):
+	"""This is mainly independent of the rest, so do simple duplicate work to be able to create this separately"""
+	from .read_tagger import get_tagger
+	bc_table = get_tagger(read_bcs(path_bc_file)).get_barcode_table()
+	with transparent_open(path_bc_table, 'wt') as f_bc:
+		f_bc.write(bc_table)
+
+
+def write_stats(stats_file: Union[Path, str], n_reads: int, stats1: dict, stats2: Optional[dict]=None):
+	with transparent_open(stats_file, 'wt') as f_s:
+		stats = dict(n_reads=n_reads, read1=stats1)
+		if stats2:
+			stats['read2'] = stats2
+		json.dump(stats, f_s, indent='\t')

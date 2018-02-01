@@ -1,9 +1,11 @@
 from collections import OrderedDict
-from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, Iterator, Dict, List, Set
+from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, Iterator, Dict, Set
 
 from ahocorasick import Automaton
 import pandas as pd
 
+from . import BASES
+from .cli import arg_len_linker, arg_len_primer
 from .logging import log
 
 
@@ -51,9 +53,6 @@ class TaggedRead(_TaggedReadBase):
 +
 {self.cut_seq(self.qual)}
 '''
-
-
-BASES = set('ATGC')
 
 
 def get_mismatches(barcode: str, *, max_mm: int=1) -> Generator[str, None, None]:
@@ -188,3 +187,8 @@ td    {{ color: #94D0FF }}
 </style>
 {html}
 '''
+
+
+def get_tagger(id_to_bc: Iterable[Tuple[str, str]], len_linker: int=arg_len_linker.default, len_primer: int=arg_len_primer.default):
+	bc_to_id = {bc: id_ for id_, bc in id_to_bc}
+	return ReadTagger(bc_to_id, len_linker, len_primer)

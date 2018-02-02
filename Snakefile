@@ -57,7 +57,7 @@ rule bc_table:
 		'barcodes/barcodes.htm'
 	run:
 		from bartseq.io import write_bc_table
-		write_bc_table(input[0], output[0])
+		write_bc_table(input, output)
 
 rule tag_reads:
 	input:
@@ -74,6 +74,38 @@ rule tag_reads:
 			bc_file=input.bc_file,
 			stats_file=output.stats_file,
 		)
+
+rule build_index:
+	input:
+		'amplicons/amplicons.txt'
+	output:
+		fa = temp('amplicons/amplicons.fa'),
+		idx = expand('amplicons/amplicons.{n}.ht2', n=range(1, 9)),
+	threads: 4
+	shell:
+		r'''
+		cat {input} | tail -n +2 | cut -f 1,4 | sed 's/^ */>/;s/\t/\n/' > {output.fa}
+		hisat2-build -p {threads} {output.fa} amplicons/amplicons
+		'''
+
+rule map_reads:
+	input:
+		amplicons = expand('amplicons/amplicons.{n}.ht2', n=range(1, 9)),
+		read = 'tagged/{name_full}.fastq.gz',
+	output:
+		'mapped/{name_full}.txt'
+	threads: 4
+	shell:
+		'''
+		hisat2 \
+			--threads {threads} \
+			--reorder \
+			-k 1 \
+			-x amplicons/amplicons \
+			-q -U {input.read} | \
+			grep -v "^@" - | \
+			cut -f3 > {output}
+		'''
 
 #Needs https://bitbucket.org/snakemake/snakemake/pull-requests/264
 rule dag:

@@ -1,11 +1,18 @@
 # usage example: snakemake -d data/ngs15 -j 4
+import json
+import re
+from collections import Counter
 
+from tqdm import tqdm
 from snakemake.utils import min_version, listfiles
+
+from bartseq.io import write_bc_table, transparent_open
 
 
 min_version('4.5.1')
 
 read_file_names = [(w.readname, w.read) for _, w in listfiles('rawdata/{readname}_R{read,[12]}_001.fastq.gz')]
+lib_names = [readname for readname, read in read_file_names if read == '1']
 
 def get_read_path(prefix, name, read, suffix='.fastq.gz'):
 	return '{prefix}/{name}_R{read}_001{suffix}'.format_map(locals())
@@ -25,7 +32,7 @@ reads_raw = get_read_paths('rawdata')
 rule all:
 	input:
 		get_read_paths('qc', '_fastqc.html', '_fastqc.zip'),
-		get_read_paths('tagged'),
+		expand('counts/{name}_001.tsv', name=lib_names),
 		'barcodes/barcodes.htm',
 
 rule get_qc:
@@ -35,6 +42,17 @@ rule get_qc:
 		expand('qc/{{name_full}}_fastqc{suffix}', suffix=['.html', '.zip'])
 	shell:
 		'fastqc {input:q} -o qc'
+
+rule get_read_count:
+	input:
+		'rawdata/{name}_R1_001.fastq.gz'
+	output:
+		'rawdata/{name}_001.count.txt'
+	shell:
+		'''
+		lines=$(zcat {input[0]:q} | wc -l)
+		echo "$lines / 4" | bc > {output[0]:q}
+		'''
 
 rule trim_quality:
 	input:
@@ -56,23 +74,26 @@ rule bc_table:
 	output:
 		'barcodes/barcodes.htm'
 	run:
-		from bartseq.io import write_bc_table
 		write_bc_table(input, output)
 
 rule tag_reads:
 	input:
 		expand('trimmed/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
+		count_file='rawdata/{name}_001.count.txt',
 		bc_file='barcodes/barcodes.txt',
 	output:
 		expand('tagged/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
 		stats_file='tagged/{name}_stats.json',
 	run:
 		from bartseq.main import run
+		with open(input.count_file) as c_f:
+			total = int(c_f.read())
 		run(
 			in_1=input[0], out_1=output[0],
 			in_2=input[1], out_2=output[1],
 			bc_file=input.bc_file,
 			stats_file=output.stats_file,
+			total=total,
 		)
 
 rule build_index:
@@ -106,6 +127,38 @@ rule map_reads:
 			grep -v "^@" - | \
 			cut -f3 > {output}
 		'''
+
+rule count:
+	input:
+		reads = expand('tagged/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
+		mappings = expand('mapped/{{name}}_R{read}_001.txt', read=[1,2]),
+		count_file = 'rawdata/{name}_001.count.txt',
+	output:
+		'counts/{name}_001.tsv'
+	run:
+		bc_re = re.compile(r'barcode=(\w+)')
+		with open(input.count_file) as c_f:
+			total = int(c_f.read())
+		def get_barcodes(fastq_file):
+			for header in fastq_file:
+				next(fastq_file)
+				next(fastq_file)
+				next(fastq_file)
+				yield bc_re.search(header).group(1)
+		counts = Counter()
+		with \
+			transparent_open(input.reads[0]) as r1, open(input.mappings[0]) as m1, \
+			transparent_open(input.reads[1]) as r2, open(input.mappings[1]) as m2:
+			
+			bcs1 = get_barcodes(r1)
+			bcs2 = get_barcodes(r2)
+			for bc1, bc2, amp1, amp2 in tqdm(zip(bcs1, bcs2, m1, m2), total=total):
+				bc1, bc2 = sorted([bc1, bc2])
+				if amp1 == amp2:
+					counts[bc1, bc2] += 1
+			
+			with open(output[0], 'w') as of:
+				json.dump({''.join(bcs): c for bcs, c in counts.items()}, of, indent='\t')
 
 #Needs https://bitbucket.org/snakemake/snakemake/pull-requests/264
 rule dag:

@@ -11,6 +11,7 @@ requires = [
 	'snakemake>=4.5.1',
 	'pandas',
 	'pyahocorasick',
+	'tqdm',
 ]
 requires-python='3'
 description-file='README.rst'

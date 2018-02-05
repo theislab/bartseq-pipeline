@@ -100,7 +100,7 @@ rule amplicon_fa:
 	input:
 		'amplicons/amplicons.txt'
 	output:
-		'amplicons/amplicons.fa',
+		'amplicons/amplicons.fa'
 	shell:
 		r"cat {input} | tail -n +2 | cut -f 1,4 | sed 's/^ */>/;s/\t/\n/' > {output}"
 
@@ -120,7 +120,8 @@ rule map_reads:
 		amplicons = expand('amplicons/amplicons.{n}.ht2', n=range(1, 9)),
 		read = 'tagged/{name_full}.fastq.gz',
 	output:
-		'mapped/{name_full}.txt'
+		map = 'mapped/{name_full}.txt',
+		summary = 'mapped/{name_full}_summary.txt'
 	threads: 4
 	shell:
 		'''
@@ -129,9 +130,10 @@ rule map_reads:
 			--reorder \
 			-k 1 \
 			-x amplicons/amplicons \
+			--new-summary --summary-file  {output.summary} \
 			-q -U {input.read} | \
 			grep -v "^@" - | \
-			cut -f3 > {output}
+			cut -f3 > {output.map}
 		'''
 
 rule count:

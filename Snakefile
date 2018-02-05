@@ -9,7 +9,7 @@ from snakemake.utils import min_version, listfiles
 from bartseq.io import write_bc_table, transparent_open
 
 
-#min_version('4.5.1')
+min_version('4.5.1')
 
 read_file_names = [(w.readname, w.read) for _, w in listfiles('rawdata/{readname}_R{read,[12]}_001.fastq.gz')]
 lib_names = [readname for readname, read in read_file_names if read == '1']
@@ -130,7 +130,7 @@ rule map_reads:
 			--reorder \
 			-k 1 \
 			-x amplicons/amplicons \
-			--new-summary --summary-file  {output.summary} \
+			--new-summary --summary-file {output.summary} \
 			-q -U {input.read} | \
 			grep -v "^@" - | \
 			cut -f3 > {output.map}

@@ -9,7 +9,7 @@ from snakemake.utils import min_version, listfiles
 from bartseq.io import write_bc_table, transparent_open
 
 
-min_version('4.5.1')
+#min_version('4.5.1')
 
 read_file_names = [(w.readname, w.read) for _, w in listfiles('rawdata/{readname}_R{read,[12]}_001.fastq.gz')]
 lib_names = [readname for readname, read in read_file_names if read == '1']
@@ -70,7 +70,7 @@ rule trim_quality:
 
 rule bc_table:
 	input:
-		'barcodes/barcodes.txt'
+		'barcodes/barcodes.fa'
 	output:
 		'barcodes/barcodes.htm'
 	run:
@@ -80,7 +80,7 @@ rule tag_reads:
 	input:
 		expand('trimmed/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
 		count_file='rawdata/{name}_001.count.txt',
-		bc_file='barcodes/barcodes.txt',
+		bc_file='barcodes/barcodes.fa',
 	output:
 		expand('tagged/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
 		stats_file='tagged/{name}_stats.json',
@@ -96,17 +96,23 @@ rule tag_reads:
 			total=total,
 		)
 
-rule build_index:
+rule amplicon_fa:
 	input:
 		'amplicons/amplicons.txt'
 	output:
-		fa = temp('amplicons/amplicons.fa'),
+		'amplicons/amplicons.fa',
+	shell:
+		r"cat {input} | tail -n +2 | cut -f 1,4 | sed 's/^ */>/;s/\t/\n/' > {output}"
+
+rule build_index:
+	input:
+		'amplicons/amplicons.fa'
+	output:
 		idx = expand('amplicons/amplicons.{n}.ht2', n=range(1, 9)),
 	threads: 4
 	shell:
 		r'''
-		cat {input} | tail -n +2 | cut -f 1,4 | sed 's/^ */>/;s/\t/\n/' > {output.fa}
-		hisat2-build -p {threads} {output.fa} amplicons/amplicons
+		hisat2-build -p {threads} {input} amplicons/amplicons
 		'''
 
 rule map_reads:

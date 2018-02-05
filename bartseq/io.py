@@ -67,7 +67,7 @@ def iter_fq(lines: Iterable[str]) -> Generator[Tuple[str, str, str], None, None]
 
 
 def read_bcs(filename: Union[Path, str]) -> Generator[Tuple[str, str], None, None]:
-	with open(filename) as f_bc:
+	with Path(filename).open() as f_bc:
 		for header in f_bc:
 			header = header.rstrip('\n').lstrip('>')
 			bc = next(f_bc).rstrip('\n')

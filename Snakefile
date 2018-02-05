@@ -74,7 +74,7 @@ rule bc_table:
 	output:
 		'barcodes/barcodes.htm'
 	run:
-		write_bc_table(input, output)
+		write_bc_table(input[0], output[0])
 
 rule tag_reads:
 	input:

@@ -68,11 +68,10 @@ def iter_fq(lines: Iterable[str]) -> Generator[Tuple[str, str, str], None, None]
 
 def read_bcs(filename: Union[Path, str]) -> Generator[Tuple[str, str], None, None]:
 	with open(filename) as f_bc:
-		header = next(f_bc)
-		assert not all(c in BASES for field in header.split(' ') for c in field)
-		for l in f_bc:
-			id_, bc = l.rstrip('\n').split('\t')
-			yield id_, bc
+		for header in f_bc:
+			header = header.rstrip('\n').lstrip('>')
+			bc = next(f_bc).rstrip('\n')
+			yield header, bc
 
 
 def write_bc_table(path_bc_file: Union[Path, str], path_bc_table: Union[Path, str]):

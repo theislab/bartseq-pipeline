@@ -32,7 +32,7 @@ reads_raw = get_read_paths('rawdata')
 rule all:
 	input:
 		get_read_paths('qc', '_fastqc.html', '_fastqc.zip'),
-		expand('counts/{name}_001.tsv', name=lib_names),
+		expand('counts/{name}_001.json', name=lib_names),
 		'barcodes/barcodes.htm',
 
 rule get_qc:
@@ -142,7 +142,7 @@ rule count:
 		mappings = expand('mapped/{{name}}_R{read}_001.txt', read=[1,2]),
 		count_file = 'rawdata/{name}_001.count.txt',
 	output:
-		'counts/{name}_001.tsv'
+		'counts/{name}_001.json'
 	run:
 		bc_re = re.compile(r'barcode=(\w+)')
 		with open(input.count_file) as c_f:

@@ -185,7 +185,7 @@ rule combine_counts:
 		table_useful = entries_useful.pivot('bc_l', 'bc_r', 'count')
 		table_all = entries_all.pivot('bc_l', 'bc_r', 'count')
 		for o in output:
-			table: pd.DataFrame = table_all if '-all' in o else table_useful
+			table = table_all if '-all' in o else table_useful
 			if o.endswith('.svg'):
 				plot = sns.heatmap(table.transform(pd.np.log1p))
 				plot.set(xlabel='', ylabel='')

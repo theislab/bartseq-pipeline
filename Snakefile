@@ -1,8 +1,8 @@
 # usage example: snakemake -d data/ngs15 -j 4
-import json
 import re
 from collections import Counter
 
+import pandas as pd
 from tqdm import tqdm
 from snakemake.utils import min_version, listfiles
 
@@ -32,7 +32,7 @@ reads_raw = get_read_paths('rawdata')
 rule all:
 	input:
 		get_read_paths('qc', '_fastqc.html', '_fastqc.zip'),
-		expand('counts/{name}_001.json', name=lib_names),
+		expand('counts/counts{which}.{ext}', which=['', '-all'], ext=['tsv', 'html']),
 		'barcodes/barcodes.htm',
 
 rule get_qc:
@@ -142,7 +142,7 @@ rule count:
 		mappings = expand('mapped/{{name}}_R{read}_001.txt', read=[1,2]),
 		count_file = 'rawdata/{name}_001.count.txt',
 	output:
-		'counts/{name}_001.json'
+		'counts/{name}_001.tsv'
 	run:
 		bc_re = re.compile(r'barcode=(\w+)')
 		with open(input.count_file) as c_f:
@@ -166,7 +166,30 @@ rule count:
 					counts[bc1, bc2] += 1
 			
 			with open(output[0], 'w') as of:
-				json.dump({''.join(bcs): c for bcs, c in counts.items()}, of, indent='\t')
+				print('bc_l', 'bc_r', 'count', sep='\t', file=of)
+				for (bc_l, bc_r), c in counts.items():
+					print(bc_l, bc_r, c, sep='\t', file=of)
+
+rule combine_counts:
+	input:
+		expand('counts/{name}_001.tsv', name=lib_names)
+	output:
+		expand('counts/counts{which}.{ext}', which=['', '-all'], ext=['tsv', 'html'])
+	run:
+		entries_all = pd.concat([pd.read_csv(f, '\t') for f in input])
+		entries_useful = entries_all[
+			entries_all.bc_l.str.match('L.*') &
+			entries_all.bc_r.str.match('R.*')]
+		table_useful = entries_useful.pivot('bc_l', 'bc_r', 'count')
+		table_all = entries_all.pivot('bc_l', 'bc_r', 'count')
+		for o in output:
+			table = table_all if '-all' in o else table_useful
+			if o.endswith('.html'):
+				with open(o, 'w') as f:
+					f.write(table.style.background_gradient(cmap='magma').render())
+			else:
+				table.to_csv(o, '\t')
+
 
 #Needs https://bitbucket.org/snakemake/snakemake/pull-requests/264
 rule dag:

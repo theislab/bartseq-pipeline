@@ -10,6 +10,7 @@ home-page='https://www.helmholtz-muenchen.de/icb/bartseq'
 requires = [
 	'snakemake>=4.5.1',
 	'pandas',
+	'seaborn',
 	'pyahocorasick',
 	'tqdm',
 ]

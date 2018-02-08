@@ -2,9 +2,10 @@
 import re
 from collections import Counter
 
-import pandas as pd
-from tqdm import tqdm
 from snakemake.utils import min_version, listfiles
+import pandas as pd
+import seaborn as sns
+from tqdm import tqdm
 
 from bartseq.io import write_bc_table, transparent_open
 
@@ -13,6 +14,7 @@ min_version('4.5.1')
 
 read_file_names = [(w.readname, w.read) for _, w in listfiles('rawdata/{readname}_R{read,[12]}_001.fastq.gz')]
 lib_names = [readname for readname, read in read_file_names if read == '1']
+count_files = expand('counts/counts{which}{ext}', which=['', '-all'], ext=['.tsv', '-log.svg'])
 
 def get_read_path(prefix, name, read, suffix='.fastq.gz'):
 	return '{prefix}/{name}_R{read}_001{suffix}'.format_map(locals())
@@ -32,7 +34,7 @@ reads_raw = get_read_paths('rawdata')
 rule all:
 	input:
 		get_read_paths('qc', '_fastqc.html', '_fastqc.zip'),
-		expand('counts/counts{which}.{ext}', which=['', '-all'], ext=['tsv', 'html']),
+		count_files,
 		'barcodes/barcodes.htm',
 
 rule get_qc:
@@ -174,7 +176,7 @@ rule combine_counts:
 	input:
 		expand('counts/{name}_001.tsv', name=lib_names)
 	output:
-		expand('counts/counts{which}.{ext}', which=['', '-all'], ext=['tsv', 'html'])
+		count_files
 	run:
 		entries_all = pd.concat([pd.read_csv(f, '\t') for f in input])
 		entries_useful = entries_all[
@@ -183,10 +185,11 @@ rule combine_counts:
 		table_useful = entries_useful.pivot('bc_l', 'bc_r', 'count')
 		table_all = entries_all.pivot('bc_l', 'bc_r', 'count')
 		for o in output:
-			table = table_all if '-all' in o else table_useful
-			if o.endswith('.html'):
-				with open(o, 'w') as f:
-					f.write(table.style.background_gradient(cmap='magma').render())
+			table: pd.DataFrame = table_all if '-all' in o else table_useful
+			if o.endswith('.svg'):
+				plot = sns.heatmap(table.transform(pd.np.log1p))
+				plot.set(xlabel='', ylabel='')
+				plot.get_figure().savefig(o)
 			else:
 				table.to_csv(o, '\t')
 

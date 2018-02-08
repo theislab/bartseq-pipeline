@@ -189,12 +189,14 @@ rule combine_counts:
 			if o.endswith('.svg'):
 				plot = sns.heatmap(table.transform(pd.np.log1p))
 				plot.set(xlabel='', ylabel='')
-				plot.get_figure().savefig(
+				fig = plot.get_figure()
+				fig.savefig(
 					o,
 					bbox_inches='tight', 
 					transparent=True,
 					pad_inches=0,
 				)
+				fig.clf()
 			else:
 				table.to_csv(o, '\t')
 

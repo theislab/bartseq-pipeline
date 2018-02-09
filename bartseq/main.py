@@ -44,6 +44,7 @@ def run(
 			transparent_open(out_2, 'wt', suffix=out_compression) if has_two_reads else ctx_dummy() as f_out_2:
 		
 		n_reads = 0
+		n_both_regular = 0
 		if has_two_reads:
 			for r, (parts1, parts2) in enumerate(zip(iter_fq(f_in_1), iter_fq(f_in_2))):
 				read1 = tagger1.tag_read(*parts1)
@@ -51,6 +52,7 @@ def run(
 				
 				try:
 					if read1.is_regular and read2.is_regular:
+						n_both_regular += 1
 						f_out_1.write(str(read1))
 						f_out_2.write(str(read2))
 				except BrokenPipeError:
@@ -73,7 +75,10 @@ def run(
 		
 		if pb: pb.close()
 	
-	write_stats(stats_file, n_reads, tagger1.stats, tagger2.stats if has_two_reads else None)
+	write_stats(
+		stats_file, n_reads, n_both_regular if has_two_reads else None,
+		tagger1.stats, tagger2.stats if has_two_reads else None,
+	)
 
 
 def update_pb(pb: Optional[tqdm], tgr: ReadTagger, i: int):

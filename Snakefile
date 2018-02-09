@@ -164,13 +164,13 @@ rule count:
 	input:
 		reads = expand('process/3-tagged/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
 		mappings = expand('process/4-mapped/{{name}}_R{read}_001.txt', read=[1,2]),
-		count_file = 'process/1-index/{name}_001.count.txt',
+		stats_file='process/3-tagged/{name}_stats.json'
 	output:
 		'process/5-counts/{name}_001.tsv'
 	run:
 		bc_re = re.compile(r'barcode=(\w+)')
-		with open(input.count_file) as c_f:
-			total = int(c_f.read())
+		with open(input.stats_file) as s_f:
+			total = json.load(s_f)['n_both_regular']
 		def get_barcodes(fastq_file):
 			for header in fastq_file:
 				next(fastq_file)

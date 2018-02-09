@@ -72,7 +72,7 @@ rule trim_quality:
 		expand('in/reads/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
 	output:
 		expand('process/2-trimmed/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
-		single='process/2-trimmed/{name}_single_001.fastq.gz',
+		single = 'process/2-trimmed/{name}_single_001.fastq.gz',
 	shell:
 		'''
 		sickle pe --gzip-output --qual-type=sanger \
@@ -92,8 +92,8 @@ rule bc_table:
 rule tag_reads:
 	input:
 		expand('process/2-trimmed/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
-		count_file='process/1-index/{name}_001.count.txt',
-		bc_file='in/barcodes.fa',
+		count_file = 'process/1-index/{name}_001.count.txt',
+		bc_file = 'in/barcodes.fa',
 	output:
 		expand('process/3-tagged/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
 		stats_file='process/3-tagged/{name}_stats.json',
@@ -116,10 +116,13 @@ rule tag_stats:
 		for path in input:
 			with open(path) as f:
 				stats = json.load(f)
+				print(path)
+				print('', 'n_reads', stats['n_reads'], sep='\t')
+				print('', 'both_regular', '{:.1%}'.format(stats['n_both_regular'] / stats['n_reads']), sep='\t')
 				for read in ['read1', 'read2']:
-					print(path, read, sep='\t')
+					print('', read, sep='\t')
 					for stat, count in stats[read].items():
-						print('', stat, '{:.1%}'.format(count / stats['n_reads']), sep='\t')
+						print('', '', stat[2:], '{:.1%}'.format(count / stats['n_reads']), sep='\t')
 
 # Helper rule for Lukas’ pipeline file
 rule amplicon_fa:
@@ -164,7 +167,7 @@ rule count:
 	input:
 		reads = expand('process/3-tagged/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
 		mappings = expand('process/4-mapped/{{name}}_R{read}_001.txt', read=[1,2]),
-		stats_file='process/3-tagged/{name}_stats.json'
+		stats_file = 'process/3-tagged/{name}_stats.json'
 	output:
 		'process/5-counts/{name}_001.tsv'
 	run:

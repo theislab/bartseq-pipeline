@@ -1,5 +1,6 @@
 # usage example: snakemake -d data/ngs15 -j 4
 import re
+import json
 from collections import Counter
 
 from snakemake.utils import min_version, listfiles
@@ -14,13 +15,17 @@ from bartseq.io import write_bc_table, transparent_open
 
 min_version('4.5.1')
 
-with open('amplicons/amplicons.fa') as a_f:
+
+with open('in/amplicons.fa') as a_f:
 	amplicons = [line.lstrip('>').rstrip('\n') for line in a_f.readlines() if line.startswith('>')]
+	amplicons += ['unmapped', 'one-mapped']
 
-
-read_file_names = [(w.readname, w.read) for _, w in listfiles('rawdata/{readname}_R{read,[12]}_001.fastq.gz')]
-lib_names = [readname for readname, read in read_file_names if read == '1']
-count_files = expand('counts/{amplicon}/{amplicon}{which}{ext}', amplicon=amplicons, which=['', '-all'], ext=['.tsv', '-log.svg'])
+dir_qc = 'out/qc'
+amplicon_index_stem = 'process/1-index/amplicons'
+amplicon_index_files = expand('{stem}.{n}.ht2', stem=[amplicon_index_stem], n=range(1, 9))
+all_reads_in = [(w.readname, w.read) for _, w in listfiles('in/reads/{readname}_R{read,[12]}_001.fastq.gz')]
+lib_names = [readname for readname, read in all_reads_in if read == '1']
+all_counts_out = expand('out/counts/{amplicon}/{amplicon}{which}{ext}', amplicon=amplicons, which=['', '-all'], ext=['.tsv', '-log.svg'])
 
 def get_read_path(prefix, name, read, suffix='.fastq.gz'):
 	return '{prefix}/{name}_R{read}_001{suffix}'.format_map(locals())
@@ -30,7 +35,7 @@ def get_read_paths(prefix, *suffixes):
 		suffixes = ['.fastq.gz']
 	return [
 		get_read_path(prefix, n, r, suffix)
-		for n, r in read_file_names
+		for n, r in all_reads_in
 		for suffix in suffixes
 	]
 
@@ -39,35 +44,35 @@ reads_raw = get_read_paths('rawdata')
 
 rule all:
 	input:
-		get_read_paths('qc', '_fastqc.html', '_fastqc.zip'),
-		count_files,
-		'barcodes/barcodes.htm',
+		get_read_paths('out/qc', '_fastqc.html', '_fastqc.zip'),
+		all_counts_out,
+		'out/barcodes.htm',
 
 rule get_qc:
 	input:
-		'rawdata/{name_full}.fastq.gz'
+		'in/reads/{name_full}.fastq.gz'
 	output:
-		expand('qc/{{name_full}}_fastqc{suffix}', suffix=['.html', '.zip'])
+		expand('{dir_qc}/{{name_full}}_fastqc{suffix}', dir_qc=[dir_qc], suffix=['.html', '.zip'])
 	shell:
-		'fastqc {input:q} -o qc'
+		'fastqc {input:q} -o {dir_qc:q}'
 
 rule get_read_count:
 	input:
-		'rawdata/{name}_R1_001.fastq.gz'
+		'in/reads/{name}_R1_001.fastq.gz'
 	output:
-		'rawdata/{name}_001.count.txt'
+		'process/1-index/{name}_001.count.txt'
 	shell:
 		'''
-		lines=$(zcat {input[0]:q} | wc -l)
-		echo "$lines / 4" | bc > {output[0]:q}
+		lines=$(zcat {input:q} | wc -l)
+		echo "$lines / 4" | bc > {output:q}
 		'''
 
 rule trim_quality:
 	input:
-		expand('rawdata/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
+		expand('in/reads/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
 	output:
-		expand('trimmed/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
-		single='trimmed/{name}_single_001.fastq.gz',
+		expand('process/2-trimmed/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
+		single='process/2-trimmed/{name}_single_001.fastq.gz',
 	shell:
 		'''
 		sickle pe --gzip-output --qual-type=sanger \
@@ -78,20 +83,20 @@ rule trim_quality:
 
 rule bc_table:
 	input:
-		'barcodes/barcodes.fa'
+		'in/barcodes.fa'
 	output:
-		'barcodes/barcodes.htm'
+		'out/barcodes.htm'
 	run:
 		write_bc_table(input[0], output[0])
 
 rule tag_reads:
 	input:
-		expand('trimmed/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
-		count_file='rawdata/{name}_001.count.txt',
-		bc_file='barcodes/barcodes.fa',
+		expand('process/2-trimmed/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
+		count_file='process/1-index/{name}_001.count.txt',
+		bc_file='in/barcodes.fa',
 	output:
-		expand('tagged/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
-		stats_file='tagged/{name}_stats.json',
+		expand('process/3-tagged/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
+		stats_file='process/3-tagged/{name}_stats.json',
 	run:
 		from bartseq.main import run
 		with open(input.count_file) as c_f:
@@ -104,32 +109,43 @@ rule tag_reads:
 			total=total,
 		)
 
+rule tag_stats:
+	input:
+		expand('process/3-tagged/{name}_stats.json', name=lib_names)
+	run:
+		for path in input:
+			with open(path) as f:
+				stats = json.load(f)
+				for read in ['read1', 'read2']:
+					print(path, read, sep='\t')
+					for stat, count in stats[read].items():
+						print('', stat, '{:.1%}'.format(count / stats['n_reads']), sep='\t')
+
+# Helper rule for Lukas’ pipeline file
 rule amplicon_fa:
 	input:
-		'amplicons/amplicons.txt'
+		'in/amplicons.txt'
 	output:
-		'amplicons/amplicons.fa'
+		'in/amplicons.fa'
 	shell:
-		r"cat {input} | tail -n +2 | cut -f 1,4 | sed 's/^ */>/;s/\t/\n/' > {output}"
+		r"cat {input:q} | tail -n +2 | cut -f 1,4 | sed 's/^ */>/;s/\t/\n/' > {output:q}"
 
 rule build_index:
 	input:
-		'amplicons/amplicons.fa'
+		'in/amplicons.fa'
 	output:
-		idx = expand('amplicons/amplicons.{n}.ht2', n=range(1, 9)),
+		idx = amplicon_index_files,
 	threads: 4
 	shell:
-		r'''
-		hisat2-build -p {threads} {input} amplicons/amplicons
-		'''
+		'hisat2-build -p {threads} {input:q} {amplicon_index_stem:q}'
 
 rule map_reads:
 	input:
-		amplicons = expand('amplicons/amplicons.{n}.ht2', n=range(1, 9)),
-		read = 'tagged/{name_full}.fastq.gz',
+		amplicons = amplicon_index_files,
+		read = 'process/3-tagged/{name_full}.fastq.gz',
 	output:
-		map = 'mapped/{name_full}.txt',
-		summary = 'mapped/{name_full}_summary.txt'
+		map = 'process/4-mapped/{name_full}.txt',
+		summary = 'process/4-mapped/{name_full}_summary.txt'
 	threads: 4
 	shell:
 		'''
@@ -137,20 +153,20 @@ rule map_reads:
 			--threads {threads} \
 			--reorder \
 			-k 1 \
-			-x amplicons/amplicons \
-			--new-summary --summary-file {output.summary} \
-			-q -U {input.read} | \
+			-x {amplicon_index_stem:q} \
+			--new-summary --summary-file {output.summary:q} \
+			-q -U {input.read:q} | \
 			grep -v "^@" - | \
-			cut -f3 > {output.map}
+			cut -f3 > {output.map:q}
 		'''
 
 rule count:
 	input:
-		reads = expand('tagged/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
-		mappings = expand('mapped/{{name}}_R{read}_001.txt', read=[1,2]),
-		count_file = 'rawdata/{name}_001.count.txt',
+		reads = expand('process/3-tagged/{{name}}_R{read}_001.fastq.gz', read=[1,2]),
+		mappings = expand('process/4-mapped/{{name}}_R{read}_001.txt', read=[1,2]),
+		count_file = 'process/1-index/{name}_001.count.txt',
 	output:
-		'counts/{name}_001.tsv'
+		'process/5-counts/{name}_001.tsv'
 	run:
 		bc_re = re.compile(r'barcode=(\w+)')
 		with open(input.count_file) as c_f:
@@ -173,7 +189,9 @@ rule count:
 			for bc1, bc2, amp1, amp2 in tqdm(zip(bcs1, bcs2, amps1, amps2), total=total):
 				bc1, bc2 = sorted([bc1, bc2])
 				if amp1 == amp2:
-					counts[bc1, bc2, amp1] += 1
+					counts[bc1, bc2, 'unmapped' if amp1 == '*' else amp1] += 1
+				else:
+					counts[bc1, bc2, 'one-mapped'] += 1
 			
 			with open(output[0], 'w') as of:
 				print('bc_l', 'bc_r', 'amp', 'count', sep='\t', file=of)
@@ -182,9 +200,9 @@ rule count:
 
 rule combine_counts:
 	input:
-		expand('counts/{name}_001.tsv', name=lib_names)
+		expand('process/5-counts/{name}_001.tsv', name=lib_names)
 	output:
-		count_files
+		all_counts_out
 	run:
 		entries = pd.concat([pd.read_csv(f, '\t') for f in input])
 		entries['useful'] = entries.bc_l.str.match('L.*') & entries.bc_r.str.match('R.*')

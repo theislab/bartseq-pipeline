@@ -4,6 +4,8 @@ from collections import Counter
 
 from snakemake.utils import min_version, listfiles
 import pandas as pd
+import matplotlib
+matplotlib.rcParams['backend'] = 'agg'  # make pypy work without Qt
 import seaborn as sns
 from tqdm import tqdm
 
@@ -12,9 +14,13 @@ from bartseq.io import write_bc_table, transparent_open
 
 min_version('4.5.1')
 
+with open('amplicons/amplicons.fa') as a_f:
+	amplicons = [line.lstrip('>').rstrip('\n') for line in a_f.readlines() if line.startswith('>')]
+
+
 read_file_names = [(w.readname, w.read) for _, w in listfiles('rawdata/{readname}_R{read,[12]}_001.fastq.gz')]
 lib_names = [readname for readname, read in read_file_names if read == '1']
-count_files = expand('counts/counts{which}{ext}', which=['', '-all'], ext=['.tsv', '-log.svg'])
+count_files = expand('counts/{amplicon}/{amplicon}{which}{ext}', amplicon=amplicons, which=['', '-all'], ext=['.tsv', '-log.svg'])
 
 def get_read_path(prefix, name, read, suffix='.fastq.gz'):
 	return '{prefix}/{name}_R{read}_001{suffix}'.format_map(locals())
@@ -157,20 +163,22 @@ rule count:
 				yield bc_re.search(header).group(1)
 		counts = Counter()
 		with \
-			transparent_open(input.reads[0]) as r1, open(input.mappings[0]) as m1, \
-			transparent_open(input.reads[1]) as r2, open(input.mappings[1]) as m2:
+			transparent_open(input.reads[0]) as r1, open(input.mappings[0]) as a1, \
+			transparent_open(input.reads[1]) as r2, open(input.mappings[1]) as a2:
 			
 			bcs1 = get_barcodes(r1)
 			bcs2 = get_barcodes(r2)
-			for bc1, bc2, amp1, amp2 in tqdm(zip(bcs1, bcs2, m1, m2), total=total):
+			amps1 = (a.rstrip('\n') for a in a1)
+			amps2 = (a.rstrip('\n') for a in a2)
+			for bc1, bc2, amp1, amp2 in tqdm(zip(bcs1, bcs2, amps1, amps2), total=total):
 				bc1, bc2 = sorted([bc1, bc2])
 				if amp1 == amp2:
-					counts[bc1, bc2] += 1
+					counts[bc1, bc2, amp1] += 1
 			
 			with open(output[0], 'w') as of:
-				print('bc_l', 'bc_r', 'count', sep='\t', file=of)
-				for (bc_l, bc_r), c in counts.items():
-					print(bc_l, bc_r, c, sep='\t', file=of)
+				print('bc_l', 'bc_r', 'amp', 'count', sep='\t', file=of)
+				for fields, c in counts.items():
+					print(*fields, c, sep='\t', file=of)
 
 rule combine_counts:
 	input:
@@ -178,27 +186,29 @@ rule combine_counts:
 	output:
 		count_files
 	run:
-		entries_all = pd.concat([pd.read_csv(f, '\t') for f in input])
-		entries_useful = entries_all[
-			entries_all.bc_l.str.match('L.*') &
-			entries_all.bc_r.str.match('R.*')]
-		table_useful = entries_useful.pivot('bc_l', 'bc_r', 'count')
-		table_all = entries_all.pivot('bc_l', 'bc_r', 'count')
-		for o in output:
-			table = table_all if '-all' in o else table_useful
-			if o.endswith('.svg'):
-				plot = sns.heatmap(table.transform(pd.np.log1p))
-				plot.set(xlabel='', ylabel='')
-				fig = plot.get_figure()
-				fig.savefig(
-					o,
-					bbox_inches='tight', 
-					transparent=True,
-					pad_inches=0,
-				)
-				fig.clf()
-			else:
-				table.to_csv(o, '\t')
+		entries = pd.concat([pd.read_csv(f, '\t') for f in input])
+		entries['useful'] = entries.bc_l.str.match('L.*') & entries.bc_r.str.match('R.*')
+		for amplicon in amplicons:
+			entries_amplicon = entries[entries.amp == amplicon]
+			del entries_amplicon['amp']
+			
+			table_amplicon = entries_amplicon.pivot('bc_l', 'bc_r', 'count')
+			table_useful = entries_amplicon[entries_amplicon.useful].pivot('bc_l', 'bc_r', 'count')
+			for o in [o for o in output if amplicon in o]:
+				table = table_amplicon if '-all' in o else table_useful
+				if o.endswith('.svg'):
+					plot = sns.heatmap(table.transform(pd.np.log1p))
+					plot.set(xlabel='', ylabel='')
+					fig = plot.get_figure()
+					fig.savefig(
+						fname=o,
+						bbox_inches='tight',
+						transparent=True,
+						pad_inches=0,
+					)
+					fig.clf()
+				else:
+					table.to_csv(o, '\t')
 
 
 #Needs https://bitbucket.org/snakemake/snakemake/pull-requests/264

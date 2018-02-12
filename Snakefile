@@ -25,7 +25,7 @@ amplicon_index_stem = 'process/1-index/amplicons'
 amplicon_index_files = expand('{stem}.{n}.ht2', stem=[amplicon_index_stem], n=range(1, 9))
 all_reads_in = [(w.readname, w.read) for _, w in listfiles('in/reads/{readname}_R{read,[12]}_001.fastq.gz')]
 lib_names = [readname for readname, read in all_reads_in if read == '1']
-all_counts_out = expand('out/counts/{amplicon}/{amplicon}{which}{ext}', amplicon=amplicons, which=['', '-all'], ext=['.tsv', '-log.svg'])
+amplicon_files = expand('out/counts/{{amplicon}}/{{amplicon}}{which}{ext}', which=['', '-all'], ext=['.tsv', '-log.svg'])
 
 def get_read_path(prefix, name, read, suffix='.fastq.gz'):
 	return '{prefix}/{name}_R{read}_001{suffix}'.format_map(locals())
@@ -45,7 +45,7 @@ reads_raw = get_read_paths('rawdata')
 rule all:
 	input:
 		get_read_paths('out/qc', '_fastqc.html', '_fastqc.zip'),
-		all_counts_out,
+		expand(amplicon_files, amplicon=amplicons),
 		'out/barcodes.htm',
 
 rule get_qc:
@@ -205,31 +205,31 @@ rule combine_counts:
 	input:
 		expand('process/5-counts/{name}_001.tsv', name=lib_names)
 	output:
-		all_counts_out
+		amplicon_files
 	run:
 		entries = pd.concat([pd.read_csv(f, '\t') for f in input])
 		entries['useful'] = entries.bc_l.str.match('L.*') & entries.bc_r.str.match('R.*')
-		for amplicon in amplicons:
-			entries_amplicon = entries[entries.amp == amplicon]
-			del entries_amplicon['amp']
-			
-			table_amplicon = entries_amplicon.pivot('bc_l', 'bc_r', 'count')
-			table_useful = entries_amplicon[entries_amplicon.useful].pivot('bc_l', 'bc_r', 'count')
-			for o in [o for o in output if amplicon in o]:
-				table = table_amplicon if '-all' in o else table_useful
-				if o.endswith('.svg'):
-					plot = sns.heatmap(table.transform(pd.np.log1p))
-					plot.set(xlabel='', ylabel='')
-					fig = plot.get_figure()
-					fig.savefig(
-						fname=o,
-						bbox_inches='tight',
-						transparent=True,
-						pad_inches=0,
-					)
-					fig.clf()
-				else:
-					table.to_csv(o, '\t')
+		
+		entries_amplicon = entries[entries.amp == wildcards.amplicon]
+		del entries_amplicon['amp']
+		
+		table_amplicon = entries_amplicon.pivot('bc_l', 'bc_r', 'count')
+		table_useful = entries_amplicon[entries_amplicon.useful].pivot('bc_l', 'bc_r', 'count')
+		for o in tqdm(output):
+			table = table_amplicon if '-all' in o else table_useful
+			if o.endswith('.svg'):
+				plot = sns.heatmap(table.transform(pd.np.log1p))
+				plot.set(xlabel='', ylabel='')
+				fig = plot.get_figure()
+				fig.savefig(
+					fname=o,
+					bbox_inches='tight',
+					transparent=True,
+					pad_inches=0,
+				)
+				fig.clf()
+			else:
+				table.to_csv(o, '\t')
 
 
 #Needs https://bitbucket.org/snakemake/snakemake/pull-requests/264

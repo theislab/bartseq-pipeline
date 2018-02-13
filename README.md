@@ -80,3 +80,17 @@ Info in “NGS-15 Analysis Required Information.xlsx”. Overview:
 
 - Cell Plates
 - Bulk & Titration Plates
+
+
+NGS experiments that used for the manuscript
+--------------------------------------------
+
+Genotyping:
+- NGS4 - Lib3
+- NGS7 - Lib2
+- NGS8 - Lib1
+
+Transcriptomics:
+- NGS12 - Lib1 & Lib3
+- NGS15 - Lib1 & Lib2
+- NGS17

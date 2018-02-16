@@ -2,15 +2,17 @@
 import re
 import json
 from collections import Counter
+from pathlib import Path
 
 from snakemake.utils import min_version, listfiles
 import pandas as pd
+from tqdm import tqdm
 import matplotlib
 matplotlib.rcParams['backend'] = 'agg'  # make pypy work without Qt
-import seaborn as sns
-from tqdm import tqdm
+from plotnine import facet_wrap, theme, element_text
 
 from bartseq.io import write_bc_table, transparent_open
+from bartseq.heatmaps import plot_counts
 
 
 min_version('4.5.1')
@@ -25,7 +27,6 @@ amplicon_index_stem = 'process/1-index/amplicons'
 amplicon_index_files = expand('{stem}.{n}.ht2', stem=[amplicon_index_stem], n=range(1, 9))
 all_reads_in = [(w.readname, w.read) for _, w in listfiles('in/reads/{readname}_R{read,[12]}_001.fastq.gz')]
 lib_names = [readname for readname, read in all_reads_in if read == '1']
-amplicon_files = expand('out/counts/{{amplicon}}/{{amplicon}}{which}{ext}', which=['', '-all'], ext=['.tsv', '-log.svg'])
 
 def get_read_path(prefix, name, read, suffix='.fastq.gz'):
 	return '{prefix}/{name}_R{read}_001{suffix}'.format_map(locals())
@@ -41,11 +42,14 @@ def get_read_paths(prefix, *suffixes):
 
 reads_raw = get_read_paths('rawdata')
 
+wildcard_constraints:
+    which = '(|-all)'
 
 rule all:
 	input:
 		get_read_paths('out/qc', '_fastqc.html', '_fastqc.zip'),
-		expand(amplicon_files, amplicon=amplicons),
+		expand('out/counts/{amplicon}/{amplicon}{which}-log.png', amplicon=amplicons, which=['-all', '']),
+		'out/counts/all.png',
 		'out/barcodes.htm',
 
 rule get_qc:
@@ -201,36 +205,59 @@ rule count:
 				for fields, c in counts.items():
 					print(*fields, c, sep='\t', file=of)
 
-rule combine_counts:
+rule amplicon_counts_all:
 	input:
 		expand('process/5-counts/{name}_001.tsv', name=lib_names)
 	output:
-		amplicon_files
+		'out/counts/{amplicon}/{amplicon}-all.tsv'
 	run:
-		entries = pd.concat([pd.read_csv(f, '\t') for f in input])
-		entries['useful'] = entries.bc_l.str.match('L.*') & entries.bc_r.str.match('R.*')
+		entries_all = pd.concat([pd.read_csv(f, '\t') for f in input])
 		
-		entries_amplicon = entries[entries.amp == wildcards.amplicon]
-		del entries_amplicon['amp']
+		entries = entries_all[entries_all.amp == wildcards.amplicon]
+		del entries['amp']
 		
-		table_amplicon = entries_amplicon.pivot('bc_l', 'bc_r', 'count')
-		table_useful = entries_amplicon[entries_amplicon.useful].pivot('bc_l', 'bc_r', 'count')
-		for o in tqdm(output):
-			table = table_amplicon if '-all' in o else table_useful
-			if o.endswith('.svg'):
-				plot = sns.heatmap(table.transform(pd.np.log1p))
-				plot.set(xlabel='', ylabel='')
-				fig = plot.get_figure()
-				fig.savefig(
-					fname=o,
-					bbox_inches='tight',
-					transparent=True,
-					pad_inches=0,
-				)
-				fig.clf()
-			else:
-				table.to_csv(o, '\t')
+		table = entries.pivot('bc_l', 'bc_r', 'count')
+		table.to_csv(output[0], '\t')
 
+rule amplicon_counts:
+	input:
+		'out/counts/{amplicon}/{amplicon}-all.tsv'
+	output:
+		'out/counts/{amplicon}/{amplicon}.tsv'
+	run:
+		table_all = pd.read_csv(input[0], '\t', index_col='bc_l')
+		table = table_all.loc[table_all.index.str.match('L.*'), table_all.columns.str.match('R.*')]
+		table.to_csv(output[0], '\t')
+
+rule plot_counts:
+	input:
+		'out/counts/{amplicon}/{amplicon}{which}.tsv'
+	output:
+		'out/counts/{amplicon}/{amplicon}{which}-log.png'
+	run:
+		counts_long = pd.read_csv(input[0], '\t')
+		counts_na = counts_long.melt(['bc_l'], var_name='bc_r', value_name='Count')
+		counts = counts_na[~counts_na.Count.isna()].copy()
+		
+		gg = plot_counts(counts) + \
+			theme(axis_text_x=element_text(size=4), axis_text_y=element_text(size=4))
+		gg.save(output[0], dpi=300, verbose=False)
+
+rule plot_counts_all:
+	input:
+		expand('out/counts/{amplicon}/{amplicon}.tsv', amplicon=amplicons)
+	output:
+		expand('out/counts/all.png')
+	run:
+		tables = {Path(i).parent.name: pd.read_csv(i, '\t') for i in input}
+		table = pd.concat(tables, names=['Amplicon']).reset_index(0)
+		counts_na = table.melt(['Amplicon', 'bc_l'], var_name='bc_r', value_name='Count')
+		counts = counts_na[~counts_na.Count.isna()].copy()
+		
+		gg = plot_counts(counts) + \
+			facet_wrap('~Amplicon', ncol=4) + \
+			theme(axis_text_x=element_text(size=1.8), axis_text_y=element_text(size=1.8))
+		gg.save(output[0], dpi=300, verbose=False)
 
 #Needs https://bitbucket.org/snakemake/snakemake/pull-requests/264
 rule dag:

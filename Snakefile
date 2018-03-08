@@ -45,12 +45,13 @@ def get_read_paths(prefix, *suffixes):
 reads_raw = get_read_paths('rawdata')
 
 wildcard_constraints:
-    which = '(|-all)'
+    which = '.*'
 
 rule all:
 	input:
 		get_read_paths('out/qc', '_fastqc.html', '_fastqc.zip'),
 		expand('out/counts/{amplicon}/{amplicon}{which}-log.png', amplicon=amplicons, which=['-all', '']),
+		expand('out/counts/{amplicon}/bylib/{amplicon}-{lib_name}{which}-log.png', amplicon=amplicons, lib_name=lib_names, which=['-all', '']),
 		'out/counts/all.png',
 		'out/barcodes.htm',
 
@@ -211,7 +212,7 @@ rule amplicon_counts_lib_all:
 	input:
 		'process/5-counts/{name}_001.tsv'
 	output:
-		'out/counts/{amplicon}/{amplicon}-{name}-all.tsv'
+		'out/counts/{amplicon}/bylib/{amplicon}-{name}-all.tsv'
 	run:
 		entries_lib = pd.read_csv(input[0], '\t')
 		entries = entries_lib[entries_lib.amp == wildcards.amplicon].drop(columns=['amp'])
@@ -220,7 +221,7 @@ rule amplicon_counts_lib_all:
 
 rule amplicon_counts_all:
 	input:
-		expand('out/counts/{{amplicon}}/{{amplicon}}-{name}-all.tsv', name=lib_names)
+		expand('out/counts/{{amplicon}}/bylib/{{amplicon}}-{name}-all.tsv', name=lib_names)
 	output:
 		'out/counts/{amplicon}/{amplicon}-all.tsv'
 	run:
@@ -229,9 +230,9 @@ rule amplicon_counts_all:
 
 rule amplicon_counts:
 	input:
-		'out/counts/{amplicon}/{amplicon}-all.tsv'
+		'out/counts/{amplicon}/{matrix}-all.tsv'
 	output:
-		'out/counts/{amplicon}/{amplicon}.tsv'
+		'out/counts/{amplicon}/{matrix}.tsv'
 	run:
 		table_all = pd.read_csv(input[0], '\t', index_col='bc_l')
 		table = table_all.loc[table_all.index.str.match('L.*'), table_all.columns.str.match('R.*')]
@@ -239,9 +240,9 @@ rule amplicon_counts:
 
 rule plot_counts:
 	input:
-		'out/counts/{amplicon}/{amplicon}{which}.tsv'
+		'out/counts/{amplicon}/{matrix}{which}.tsv'
 	output:
-		'out/counts/{amplicon}/{amplicon}{which}-log.png'
+		'out/counts/{amplicon}/{matrix}{which}-log.png'
 	run:
 		counts_long = pd.read_csv(input[0], '\t')
 		counts_na = counts_long.melt(['bc_l'], var_name='bc_r', value_name='Count')

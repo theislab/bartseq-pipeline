@@ -19,7 +19,7 @@ min_version('4.5.1')
 
 
 with open('in/amplicons.fa') as a_f:
-	amplicons = [line.lstrip('>').rstrip('\n') for line in a_f.readlines() if line.startswith('>')]
+	amplicons = [line.lstrip('>').strip() for line in a_f.readlines() if line.startswith('>')]
 	amplicons += ['unmapped', 'one-mapped']
 
 dir_qc = 'out/qc'
@@ -191,8 +191,8 @@ rule count:
 			
 			bcs1 = get_barcodes(r1)
 			bcs2 = get_barcodes(r2)
-			amps1 = (a.rstrip('\n') for a in a1)
-			amps2 = (a.rstrip('\n') for a in a2)
+			amps1 = (a.strip() for a in a1)
+			amps2 = (a.strip() for a in a2)
 			for bc1, bc2, amp1, amp2 in tqdm(zip(bcs1, bcs2, amps1, amps2), total=total):
 				bc1, bc2 = sorted([bc1, bc2])
 				if amp1 == amp2:

@@ -52,11 +52,11 @@ def transparent_open(
 
 
 def parse_fq(line_header: str, line_seq: str, line_plus: str, line_qual: str) -> Tuple[str, str, str]:
-	header = line_header.rstrip('\n')
+	header = line_header.strip()
 	assert header.startswith('@')
-	seq_read = line_seq.rstrip('\n')
+	seq_read = line_seq.strip()
 	assert line_plus.startswith('+')
-	seq_qual = line_qual.rstrip('\n')
+	seq_qual = line_qual.strip()
 	return header, seq_read, seq_qual
 
 
@@ -69,8 +69,8 @@ def iter_fq(lines: Iterable[str]) -> Generator[Tuple[str, str, str], None, None]
 def read_bcs(filename: Union[Path, str]) -> Generator[Tuple[str, str], None, None]:
 	with Path(filename).open() as f_bc:
 		for header in f_bc:
-			header = header.rstrip('\n').lstrip('>')
-			bc = next(f_bc).rstrip('\n')
+			header = header.lstrip('>').strip()
+			bc = next(f_bc).strip()
 			yield header, bc
 
 

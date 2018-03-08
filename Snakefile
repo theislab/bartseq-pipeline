@@ -6,7 +6,7 @@ from functools import reduce
 from operator import add
 from pathlib import Path
 
-from snakemake.utils import min_version, listfiles
+from snakemake.utils import min_version, listfiles, format
 import pandas as pd
 from tqdm import tqdm
 import matplotlib
@@ -44,10 +44,17 @@ def get_read_paths(prefix, *suffixes):
 
 reads_raw = get_read_paths('rawdata')
 
+re_amplicon = '({})'.format('|'.join(re.escape(a) for a in amplicons))
+re_lib_name = '({})'.format('|'.join(re.escape(ln) for ln in lib_names))
+re_matrix = format('({re_amplicon}|bylib/{re_amplicon}-{re_lib_name})')
+
+
 wildcard_constraints:
-    which = '.*',
-    amplicon = '({})'.format('|'.join(re.escape(a) for a in amplicons)),
-    lib_name = '({})'.format('|'.join(re.escape(ln) for ln in lib_names)),
+	which = '(-all|)',
+	amplicon = re_amplicon,
+	lib_name = re_lib_name,
+	matrix = re_matrix,
+
 
 rule all:
 	input:

@@ -212,10 +212,7 @@ rule amplicon_counts_all:
 		'out/counts/{amplicon}/{amplicon}-all.tsv'
 	run:
 		entries_all = pd.concat([pd.read_csv(f, '\t') for f in input])
-		
-		entries = entries_all[entries_all.amp == wildcards.amplicon]
-		del entries['amp']
-		
+		entries = entries_all[entries_all.amp == wildcards.amplicon].drop(columns=['amp'])
 		table = entries.pivot('bc_l', 'bc_r', 'count')
 		table.to_csv(output[0], '\t')
 

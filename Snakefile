@@ -251,7 +251,7 @@ rule plot_counts:
 		counts_na = counts_long.melt(['bc_l'], var_name='bc_r', value_name='Count')
 		counts = counts_na[~counts_na.Count.isna()].copy()
 		
-		if 0 in counts.shape:
+		if counts.shape[0] <= 1:
 			with open(output[0], 'wb') as empty:
 				empty.write(b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x04\x00\x00\x00\xb5\x1c\x0c\x02\x00\x00\x00\x0bIDATx\xdacd`\x00\x00\x00\x06\x00\x020\x81\xd0/\x00\x00\x00\x00IEND\xaeB`\x82')
 			return

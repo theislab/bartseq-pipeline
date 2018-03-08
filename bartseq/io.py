@@ -6,7 +6,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Union, Optional, Iterable, Tuple, Generator
 
-from . import BASES
 
 openers = dict(
 	gz=gzip.open,

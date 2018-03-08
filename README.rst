@@ -2,7 +2,7 @@ Notes
 =====
 Problems? Ask Fatma
 
-[Cleaned Richa code](https://github.com/theislab/bartSeq)
+`Cleaned Richa code <https://github.com/theislab/bartSeq>`_
 
 Read structure
 --------------
@@ -34,35 +34,36 @@ Possible Problems
 
 Test data
 ---------
-1. Old good quality data (purified)
-2. MiSeq (better quality) & NextSeq (maybe unpurified but both protocols)
-3. Only NextSeq (important goal)
+#. Old good quality data (purified)
+#. MiSeq (better quality) & NextSeq (maybe unpurified but both protocols)
+#. Only NextSeq (important goal)
 
 Everything up until NGS15 purified.
 
 Good test data: NGS12 MiSeq, NGS15 NextSeq, NGS17 MiSeq!
 
-### NGS15 and NGS17
+NGS15 and NGS17
+~~~~~~~~~~~~~~~
 
 NGS15 NextSeq libraries:
 
--   Library1: Single Cell Replicate 1 (NGS15_SC_Rep1)
+- Library1: Single Cell Replicate 1 (NGS15_SC_Rep1)
 
--   Library2: Single Cell Replicate 2 (NGS15_SC_Rep2)
+- Library2: Single Cell Replicate 2 (NGS15_SC_Rep2)
 
-    Biological replicate of Library 1 i.e. another library, so for MiSeq-NextSeq comparison we can ignore this, because we didn't analyze it on a MiSeq device
+  Biological replicate of Library 1 i.e. another library, so for MiSeq-NextSeq comparison we can ignore this, because we didn't analyze it on a MiSeq device
 
--   Library3: Bulk RNA Titration Replicate 1 (NGS15_Bulk_Rep1)
+- Library3: Bulk RNA Titration Replicate 1 (NGS15_Bulk_Rep1)
 
--   Library4: Bulk RNA Titration Replicate 2 (NGS15_Bulk_Rep2)
+- Library4: Bulk RNA Titration Replicate 2 (NGS15_Bulk_Rep2)
 
-    These were the dilution series where we had 4-fold dilutions of bulk RNA samples
+  These were the dilution series where we had 4-fold dilutions of bulk RNA samples
 
--   Library5: Spike-in Titration Replicate 1 (NGS15_Titration_Rep1)
+- Library5: Spike-in Titration Replicate 1 (NGS15_Titration_Rep1)
 
--   Library6: Spike-in Titration Replicate 2 (NGS15_Titration_Rep2)
+- Library6: Spike-in Titration Replicate 2 (NGS15_Titration_Rep2)
 
-    These were the dilution series where we had 10-fold dilutions of RNAspike-ins
+  These were the dilution series where we had 10-fold dilutions of RNAspike-ins
 
 Lib 1 re-analyzed in MiSeq. Corresponding files:
 
@@ -86,11 +87,13 @@ NGS experiments that used for the manuscript
 --------------------------------------------
 
 Genotyping:
+
 - NGS4 - Lib3
 - NGS7 - Lib2
 - NGS8 - Lib1
 
 Transcriptomics:
+
 - NGS12 - Lib1 & Lib3
 - NGS15 - Lib1 & Lib2
 - NGS17

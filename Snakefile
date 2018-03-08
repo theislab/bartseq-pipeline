@@ -254,6 +254,7 @@ rule plot_counts:
 		if 0 in counts.shape:
 			with open(output[0], 'wb') as empty:
 				empty.write(b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x04\x00\x00\x00\xb5\x1c\x0c\x02\x00\x00\x00\x0bIDATx\xdacd`\x00\x00\x00\x06\x00\x020\x81\xd0/\x00\x00\x00\x00IEND\xaeB`\x82')
+			return
 		
 		gg = plot_counts(counts) + \
 			theme(axis_text_x=element_text(size=4), axis_text_y=element_text(size=4))

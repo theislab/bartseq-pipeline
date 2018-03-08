@@ -235,7 +235,10 @@ rule amplicon_counts:
 		'out/counts/{amplicon}/{matrix}.tsv'
 	run:
 		table_all = pd.read_csv(input[0], '\t', index_col='bc_l')
-		table = table_all.loc[table_all.index.str.match('L.*'), table_all.columns.str.match('R.*')]
+		if table_all.shape == (0, 0):  # here, the empty index can’t use str methods
+			table = table_all
+		else:
+			table = table_all.loc[table_all.index.str.match('L.*'), table_all.columns.str.match('R.*')]
 		table.to_csv(output[0], '\t')
 
 rule plot_counts:

@@ -2,6 +2,8 @@
 import re
 import json
 from collections import Counter
+from functools import reduce
+from operator import add
 from pathlib import Path
 
 from snakemake.utils import min_version, listfiles
@@ -205,15 +207,24 @@ rule count:
 				for fields, c in counts.items():
 					print(*fields, c, sep='\t', file=of)
 
+rule amplicon_counts_lib_all:
+	input:
+		'process/5-counts/{name}_001.tsv'
+	output:
+		'out/counts/{amplicon}/{amplicon}-{name}-all.tsv'
+	run:
+		entries_lib = pd.read_csv(input[0], '\t')
+		entries = entries_lib[entries_lib.amp == wildcards.amplicon].drop(columns=['amp'])
+		table = entries.pivot('bc_l', 'bc_r', 'count')
+		table.to_csv(output[0], '\t')
+
 rule amplicon_counts_all:
 	input:
-		expand('process/5-counts/{name}_001.tsv', name=lib_names)
+		expand('out/counts/{{amplicon}}/{{amplicon}}-{name}-all.tsv', name=lib_names)
 	output:
 		'out/counts/{amplicon}/{amplicon}-all.tsv'
 	run:
-		entries_all = pd.concat([pd.read_csv(f, '\t') for f in input])
-		entries = entries_all[entries_all.amp == wildcards.amplicon].drop(columns=['amp'])
-		table = entries.pivot('bc_l', 'bc_r', 'count')
+		table = reduce(add, [pd.read_csv(f, '\t', index_col='bc_l') for f in input])
 		table.to_csv(output[0], '\t')
 
 rule amplicon_counts:

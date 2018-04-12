@@ -5,6 +5,7 @@ from collections import Counter
 from functools import reduce
 from operator import add
 from pathlib import Path
+from typing import Dict
 
 from snakemake.utils import min_version, listfiles, format
 import pandas as pd
@@ -18,6 +19,8 @@ from bartseq.heatmaps import plot_counts
 
 
 min_version('4.5.1')
+
+EMPTY_PNG = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x04\x00\x00\x00\xb5\x1c\x0c\x02\x00\x00\x00\x0bIDATx\xdacd`\x00\x00\x00\x06\x00\x020\x81\xd0/\x00\x00\x00\x00IEND\xaeB`\x82'
 
 
 with open('in/amplicons.fa') as a_f:
@@ -63,6 +66,7 @@ rule all:
 		expand('out/counts/{amplicon}/bylib/{amplicon}-{lib_name}{which}-log.png', amplicon=amplicons, lib_name=lib_names, which=['-all', '']),
 		expand('out/counts/bylib/{lib_name}/{amplicon}{which}-log.png', lib_name=lib_names, amplicon=amplicons, which=['-all', '']),
 		'out/counts/all.png',
+		'out/counts/all.xlsx',
 		'out/barcodes.htm',
 
 rule get_qc:
@@ -263,12 +267,17 @@ rule plot_counts:
 		
 		if counts.shape[0] <= 2:
 			with open(output[0], 'wb') as empty:
-				empty.write(b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x04\x00\x00\x00\xb5\x1c\x0c\x02\x00\x00\x00\x0bIDATx\xdacd`\x00\x00\x00\x06\x00\x020\x81\xd0/\x00\x00\x00\x00IEND\xaeB`\x82')
+				empty.write(EMPTY_PNG)
 			return
 		
 		gg = plot_counts(counts) + \
 			theme(axis_text_x=element_text(size=4), axis_text_y=element_text(size=4))
 		gg.save(output[0], dpi=300, verbose=False)
+
+def amp_tables_to_counts(tables: Dict[str, pd.DataFrame]):
+	table = pd.concat(tables, names=['Amplicon']).reset_index(0)
+	counts_na = table.melt(['Amplicon', 'bc_l'], var_name='bc_r', value_name='Count')
+	return counts_na[~counts_na.Count.isna()].copy()
 
 rule plot_counts_all:
 	input:
@@ -277,9 +286,7 @@ rule plot_counts_all:
 		expand('out/counts/all.png')
 	run:
 		tables = {Path(i).parent.name: pd.read_csv(i, '\t') for i in input}
-		table = pd.concat(tables, names=['Amplicon']).reset_index(0)
-		counts_na = table.melt(['Amplicon', 'bc_l'], var_name='bc_r', value_name='Count')
-		counts = counts_na[~counts_na.Count.isna()].copy()
+		counts = amp_tables_to_counts(tables)
 		
 		gg = plot_counts(counts) + \
 			facet_wrap('~Amplicon', ncol=4) + \
@@ -293,6 +300,34 @@ rule count_symlink:
 		'out/counts/bylib/{lib_name}/{amplicon}{which}-log.png'
 	shell:
 		'ln -sf ../../../../{input:q} {output:q}'
+
+rule spreadsheet:
+	input:
+		expand('out/counts/{amplicon}/bylib/{amplicon}-{lib_name}.tsv', amplicon=amplicons, lib_name=lib_names)
+	output:
+		'out/counts/all.xlsx'
+	run:
+		import openpyxl
+		from openpyxl.utils.dataframe import dataframe_to_rows
+		
+		re_name = re.compile(format('^{re_amplicon}-{re_lib_name}\.tsv$'))
+		tables_all = {
+			tuple(re_name.match(Path(i).name).groups()):
+			pd.read_csv(i, '\t') for i in input
+		}
+		
+		wb = openpyxl.Workbook()
+		wb.remove(wb.active)
+		for lib in lib_names:
+			tables_lib = {amp: table for (amp, l), table in tables_all.items() if l == lib}
+			counts = amp_tables_to_counts(tables_lib)
+			sheet = counts.pivot_table('Count', ['bc_l', 'bc_r'], 'Amplicon').reset_index()
+			
+			ws = wb.create_sheet(lib)
+			for r in dataframe_to_rows(sheet, index=False, header=True):
+				if not (len(r) == 1 and r[0] is None):
+					ws.append(r)
+		wb.save(output[0])
 
 #Needs https://bitbucket.org/snakemake/snakemake/pull-requests/264
 rule dag:

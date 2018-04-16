@@ -3,7 +3,7 @@ from typing import Generator, Union, Iterable, Optional
 
 from tqdm import tqdm
 
-from .cli import arg_total, arg_len_primer, arg_len_linker
+from . import defaults
 from .logging import init_logging
 from .read_tagger import ReadTagger, get_tagger
 from .io import transparent_open, iter_fq, read_bcs, write_bc_table, write_stats
@@ -18,9 +18,9 @@ def run(
 	bc_file: str,
 	stats_file: str,
 	bc_table: Optional[str] = None,
-	total: int = arg_total.default,
-	len_primer: int = arg_len_primer.default,
-	len_linker: int = arg_len_linker.default,
+	total: int = defaults.total,
+	len_primer: int = defaults.len_primer,
+	len_linker: int = defaults.len_linker,
 	in_compression: Optional[str] = None,
 	out_compression: Optional[str] = None,
 	log_init=True

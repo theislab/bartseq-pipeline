@@ -4,8 +4,7 @@ from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, 
 from ahocorasick import Automaton
 import pandas as pd
 
-from . import BASES
-from .cli import arg_len_linker, arg_len_primer
+from . import BASES, defaults
 from .logging import log
 
 
@@ -189,6 +188,6 @@ td    {{ color: #94D0FF }}
 '''
 
 
-def get_tagger(id_to_bc: Iterable[Tuple[str, str]], len_linker: int=arg_len_linker.default, len_primer: int=arg_len_primer.default):
+def get_tagger(id_to_bc: Iterable[Tuple[str, str]], len_linker: int=defaults.len_linker, len_primer: int=defaults.len_primer):
 	bc_to_id = {bc: id_ for id_, bc in id_to_bc}
 	return ReadTagger(bc_to_id, len_linker, len_primer)

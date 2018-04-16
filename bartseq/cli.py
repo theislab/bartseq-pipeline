@@ -4,6 +4,7 @@ from typing import Sequence, Any, Union
 
 import sys
 
+from . import defaults
 from .io import openers
 
 
@@ -29,14 +30,14 @@ parser.add_argument(
 parser.add_argument(
 	'--bc-table', '-B', nargs='?',
 	help='File name for the HTML table of barcode mismatches')
-arg_total = parser.add_argument(
-	'--total', '-t', type=int, default=0,
+parser.add_argument(
+	'--total', '-t', type=int, default=defaults.total,
 	help='Number of fastq records in file. “0” means no progressbar')  # type: Action
-arg_len_primer = parser.add_argument(
-	'--len-primer', '-p', type=int, default=27,
+parser.add_argument(
+	'--len-primer', '-p', type=int, default=defaults.len_primer,
 	help='Primer length for stats')  # type: Action
-arg_len_linker = parser.add_argument(
-	'--len-linker', '-l', type=int, default=10,
+parser.add_argument(
+	'--len-linker', '-l', type=int, default=defaults.len_linker,
 	help='Linker length to cut out')  # type: Action
 parser.add_argument(
 	'--in-compression', '-i', choices=openers.keys(),

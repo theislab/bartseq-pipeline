@@ -5,7 +5,7 @@ from typing import Sequence, Any, Union
 import sys
 
 from . import defaults
-from .io import openers
+from ..io import openers
 
 
 parser = ArgumentParser()

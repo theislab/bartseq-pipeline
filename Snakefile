@@ -14,9 +14,8 @@ import matplotlib
 matplotlib.rcParams['backend'] = 'agg'  # make pypy work without Qt
 from plotnine import facet_wrap, theme, element_text
 
-from bartseq.io import write_bc_table, transparent_open
-from bartseq.heatmaps import plot_counts
-
+from bartseq.io import transparent_open
+from bartseq.read_tagger.io import write_bc_table
 
 min_version('4.5.1')
 
@@ -119,7 +118,7 @@ rule tag_reads:
 		expand('process/3-tagged/{{lib_name}}_R{read}_001.fastq.gz', read=[1,2]),
 		stats_file='process/3-tagged/{lib_name}_stats.json',
 	run:
-		from bartseq.main import run
+		from bartseq.read_tagger.main import run
 		with open(input.count_file) as c_f:
 			total = int(c_f.read())
 		run(

@@ -3,10 +3,10 @@ from typing import Generator, Union, Iterable, Optional
 
 from tqdm import tqdm
 
-from . import defaults
-from .logging import init_logging
-from .read_tagger import ReadTagger, get_tagger
-from .io import transparent_open, iter_fq, read_bcs, write_bc_table, write_stats
+from . import defaults, ReadTagger, get_tagger
+from .io import write_bc_table, write_stats
+from ..io import transparent_open, iter_fq, read_fasta
+from ..logging import init_logging
 
 
 def run(
@@ -28,7 +28,7 @@ def run(
 	if log_init:
 		init_logging()
 	has_two_reads = bool(in_2)
-	bcs_all = list(read_bcs(bc_file))
+	bcs_all = list(read_fasta(bc_file))
 	
 	if bc_table:
 		write_bc_table(bc_file, bc_table)

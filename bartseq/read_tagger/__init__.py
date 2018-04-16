@@ -4,8 +4,11 @@ from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, 
 from ahocorasick import Automaton
 import pandas as pd
 
-from .. import BASES, defaults
+from . import defaults
 from ..logging import log
+
+
+BASES = set('ATGC')
 
 
 _TaggedReadBase = NamedTuple('_TaggedReadBase', [

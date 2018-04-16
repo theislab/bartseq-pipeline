@@ -4,8 +4,8 @@ from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, 
 from ahocorasick import Automaton
 import pandas as pd
 
-from . import BASES, defaults
-from .logging import log
+from .. import BASES, defaults
+from ..logging import log
 
 
 _TaggedReadBase = NamedTuple('_TaggedReadBase', [
@@ -19,6 +19,7 @@ _TaggedReadBase = NamedTuple('_TaggedReadBase', [
 	('other_barcodes', FrozenSet[str]),
 	('barcode_mismatch', bool),
 ])
+
 
 class TaggedRead(_TaggedReadBase):
 	@property
@@ -54,7 +55,7 @@ class TaggedRead(_TaggedReadBase):
 '''
 
 
-def get_mismatches(barcode: str, *, max_mm: int=1) -> Generator[str, None, None]:
+def get_mismatches(barcode: str, *, max_mm: int = 1) -> Generator[str, None, None]:
 	yield barcode
 	if max_mm != 1:
 		raise NotImplemented
@@ -64,7 +65,11 @@ def get_mismatches(barcode: str, *, max_mm: int=1) -> Generator[str, None, None]
 				yield f'{barcode[:i]}{mismatch}{barcode[i+1:]}'
 
 
-def get_all_barcodes(barcodes: Iterable[str], *, max_mm: int=1) -> Tuple[Dict[str, str], Dict[str, Set[Tuple[str, str]]]]:
+def get_all_barcodes(
+	barcodes: Iterable[str],
+	*,
+	max_mm: int = 1
+) -> Tuple[Dict[str, str], Dict[str, Set[Tuple[str, str]]]]:
 	found = {}
 	blacklist = {}
 	
@@ -89,7 +94,14 @@ def get_all_barcodes(barcodes: Iterable[str], *, max_mm: int=1) -> Tuple[Dict[st
 
 
 class ReadTagger:
-	def __init__(self, bc_to_id: Dict[str, str], len_linker: int, len_primer: int, *, max_mm: int=1, use_stats: bool=True):
+	def __init__(self,
+		bc_to_id: Dict[str, str],
+		len_linker: int,
+		len_primer: int,
+		*,
+		max_mm: int = 1,
+		use_stats: bool = True
+	):
 		self.bc_to_id = bc_to_id
 		self.len_linker = len_linker
 		self.len_primer = len_primer
@@ -134,7 +146,10 @@ class ReadTagger:
 			amplicon = seq_read
 			barcode_mismatch = False
 		
-		read = TaggedRead(header, seq_qual, self.len_primer, junk, self.bc_to_id.get(barcode, None), linker, amplicon, other_barcodes, barcode_mismatch)
+		read = TaggedRead(
+			header, seq_qual, self.len_primer, junk, self.bc_to_id.get(barcode, None),
+			linker, amplicon, other_barcodes, barcode_mismatch,
+		)
 		
 		if self.stats is not None:
 			if read.is_just_primer:        self.stats['n_only_primer'] += 1
@@ -188,6 +203,10 @@ td    {{ color: #94D0FF }}
 '''
 
 
-def get_tagger(id_to_bc: Iterable[Tuple[str, str]], len_linker: int=defaults.len_linker, len_primer: int=defaults.len_primer):
+def get_tagger(
+	id_to_bc: Iterable[Tuple[str, str]],
+	len_linker: int = defaults.len_linker,
+	len_primer: int = defaults.len_primer,
+):
 	bc_to_id = {bc: id_ for id_, bc in id_to_bc}
 	return ReadTagger(bc_to_id, len_linker, len_primer)

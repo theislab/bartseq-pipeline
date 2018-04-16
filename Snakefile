@@ -321,7 +321,7 @@ rule spreadsheet:
 		for lib in lib_names:
 			tables_lib = {amp: table for (amp, l), table in tables_all.items() if l == lib}
 			counts = amp_tables_to_counts(tables_lib)
-			sheet = counts.pivot_table('Count', ['bc_l', 'bc_r'], 'Amplicon').reset_index()
+			sheet = counts.pivot_table('Count', ['bc_l', 'bc_r'], 'Amplicon').reset_index().fillna(0)
 			
 			ws = wb.create_sheet(lib)
 			for r in dataframe_to_rows(sheet, index=False, header=True):

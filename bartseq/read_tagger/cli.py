@@ -1,7 +1,4 @@
 from argparse import ArgumentParser, Action, Namespace, ArgumentError
-from pathlib import Path
-
-import sys
 
 from . import defaults
 from ..io import openers

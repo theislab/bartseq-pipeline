@@ -1,3 +1,3 @@
-from .cli import ReadTaggerCLI
+from .cli import cli
 
-ReadTaggerCLI.run_as_main()
+cli.run_as_main()

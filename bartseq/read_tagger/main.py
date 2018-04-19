@@ -23,11 +23,22 @@ def run(
 	len_linker: int = defaults.len_linker,
 	in_compression: Optional[str] = None,
 	out_compression: Optional[str] = None,
+	dry_run=False,
 	log_init=True
 ):
+	has_two_reads = bool(in_2)
+	
+	if dry_run:
+		if bc_table: print('Would write bc table to', bc_file)
+		print('Would write', 'two read files:' if has_two_reads else 'one read file:')
+		print('\tWould read from', in_1, f'and {in_2}' if has_two_reads else '')
+		print('\tWould write to', out_1, f'and {out_2}' if has_two_reads else '')
+		print('Would write stats to', stats_file)
+		return
+	
 	if log_init:
 		init_logging()
-	has_two_reads = bool(in_2)
+	
 	bcs_all = list(read_fasta(bc_file))
 	
 	if bc_table:

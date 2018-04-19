@@ -9,8 +9,6 @@ from ..cli_helpers import CLI
 
 
 class ReadTaggerCLI(CLI):
-	COMMAND = 'tag'
-	
 	@staticmethod
 	def populate_parser(parser: ArgumentParser) -> ArgumentParser:
 		parser.add_argument(
@@ -49,18 +47,27 @@ class ReadTaggerCLI(CLI):
 		parser.add_argument(
 			'--out-compression', '-o', choices=openers.keys(),
 			help='Specify compression if writing to stdout or a file with unusual suffix')
+		parser.add_argument(
+			'--dry-run', '-n', action='store_true',
+			help='Only print what would be done and exit')
 		
 		return parser
+	
+	@staticmethod
+	def _ensure_exists(args: Namespace, key: str):
+		path = getattr(args, key)
+		if path == '-':
+			setattr(args, key, sys.stdout)
+		elif path is not None and not args.dry_run:
+			Path(path).parent.mkdir(parents=True, exist_ok=True)
 	
 	@staticmethod
 	def modify_args(parser: ArgumentParser, args: Namespace) -> Namespace:
 		if args.in_1 == '-': args.in_1 = sys.stdin
 		if args.in_2 == '-': args.in_2 = sys.stdin
 		
-		if args.out_1 == '-': args.out_1 = sys.stdout
-		else: Path(args.out_1).parent.mkdir(parents=True, exist_ok=True)
-		if args.out_2 == '-': args.out_2 = sys.stdout
-		else: Path(args.out_2).parent.mkdir(parents=True, exist_ok=True)
+		ReadTaggerCLI._ensure_exists(args, 'out_1')
+		ReadTaggerCLI._ensure_exists(args, 'out_2')
 		
 		def find_action(dest: str) -> Action:
 			return next(action for action in parser._actions if action.dest == dest)
@@ -76,6 +83,11 @@ class ReadTaggerCLI(CLI):
 		return args
 	
 	@staticmethod
-	def run(args: Namespace):
+	def run(parser: ArgumentParser, args: Namespace):
 		from .main import run
-		run(**vars(args))
+		kwargs = vars(args)
+		del kwargs['func']
+		run(**kwargs)
+
+
+cli = ReadTaggerCLI()

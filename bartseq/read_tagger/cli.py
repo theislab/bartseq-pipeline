@@ -5,23 +5,23 @@ import sys
 
 from . import defaults
 from ..io import openers
-from ..cli_helpers import CLI
+from ..cli_helpers import CLI, t_in_file, t_out_file
 
 
 class ReadTaggerCLI(CLI):
 	@staticmethod
 	def populate_parser(parser: ArgumentParser) -> ArgumentParser:
 		parser.add_argument(
-			'in_1', nargs='?', default='-',
+			'in_1', nargs='?', default='-', type=t_in_file,
 			help='Read1 file to read from. Supported compression: see --in-compression')
 		parser.add_argument(
-			'out_1', nargs='?', default='-',
+			'out_1', nargs='?', default='-', type=t_out_file,
 			help='Read1 file to write to. Supported compression: see --out-compression')
 		parser.add_argument(
-			'--in-2', nargs='?',
+			'--in-2', nargs='?', type=t_in_file,
 			help='Read2 file to read from. Supported compression: see --in-compression')
 		parser.add_argument(
-			'--out-2', nargs='?',
+			'--out-2', nargs='?', type=t_out_file,
 			help='Read2 file to write to. Supported compression: see --out-compression')
 		parser.add_argument(
 			'--bc-file', '-b', required=True,
@@ -54,21 +54,7 @@ class ReadTaggerCLI(CLI):
 		return parser
 	
 	@staticmethod
-	def _ensure_exists(args: Namespace, key: str):
-		path = getattr(args, key)
-		if path == '-':
-			setattr(args, key, sys.stdout)
-		elif path is not None and not args.dry_run:
-			Path(path).parent.mkdir(parents=True, exist_ok=True)
-	
-	@staticmethod
-	def modify_args(parser: ArgumentParser, args: Namespace) -> Namespace:
-		if args.in_1 == '-': args.in_1 = sys.stdin
-		if args.in_2 == '-': args.in_2 = sys.stdin
-		
-		ReadTaggerCLI._ensure_exists(args, 'out_1')
-		ReadTaggerCLI._ensure_exists(args, 'out_2')
-		
+	def check_args(parser: ArgumentParser, args: Namespace):
 		def find_action(dest: str) -> Action:
 			return next(action for action in parser._actions if action.dest == dest)
 		
@@ -79,8 +65,6 @@ class ReadTaggerCLI(CLI):
 		
 		if bool(args.in_2) != bool(args.out_2):
 			raise ArgumentError(find_action('in_2'), 'You need to specify both or none of --in-2 and --out-2.')
-		
-		return args
 	
 	@staticmethod
 	def run(parser: ArgumentParser, args: Namespace):

@@ -50,9 +50,9 @@ def run(
 	
 	with tqdm(total=total) if total != 0 else ctx_dummy() as pb, \
 			transparent_open(in_1, 'rt', suffix=in_compression)  as f_in_1, \
-			transparent_open(out_1, 'wt', suffix=out_compression) as f_out_1, \
+			transparent_open(out_1, 'wt', suffix=out_compression, ensure_parentdir=True) as f_out_1, \
 			transparent_open(in_2, 'rt', suffix=in_compression) if has_two_reads else ctx_dummy() as f_in_2, \
-			transparent_open(out_2, 'wt', suffix=out_compression) if has_two_reads else ctx_dummy() as f_out_2:
+			transparent_open(out_2, 'wt', suffix=out_compression, ensure_parentdir=True) if has_two_reads else ctx_dummy() as f_out_2:
 		
 		n_reads = 0
 		n_both_regular = 0

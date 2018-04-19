@@ -18,6 +18,7 @@ def transparent_open(
 	file: Union[Path, str, Iterable[bytes]],
 	mode: str='rt',
 	*,
+	ensure_parentdir=False,
 	encoding: Optional[str]=None,
 	errors:   Optional[str]=None,
 	newline:  Optional[str]=None,
@@ -27,6 +28,7 @@ def transparent_open(
 	Open potentially compressed file
 	:param file: File path or file-like object opened in binary mode
 	:param mode: Mode of the returned file
+	:param ensure_parentdir: Ensure that the parent directory exists?
 	:param encoding: Encoding of the text data the file decompresses to (or contains if the file is uncompressed)
 	:param errors: See ``open``
 	:param newline: See ``open``
@@ -37,6 +39,8 @@ def transparent_open(
 		path = Path(file)
 		suffix = path.suffix[1:] if suffix is None else suffix
 		file = str(file)
+		if ensure_parentdir:
+			path.parent.mkdir(parents=True, exist_ok=True)
 	
 	opener = openers[suffix]
 	

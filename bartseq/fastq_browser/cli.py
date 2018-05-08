@@ -70,7 +70,7 @@ class FastqBrowserCLI(CLI):
 		path_count = dir_process / '1-index' / f'{args.library}_001.count.txt'
 		
 		with path_count.open() as c_f:
-			total = int(c_f.read())
+			n_pairs = int(c_f.read())
 		
 		with \
 			transparent_open(paths_fsq[0]) as fsq_r1, \
@@ -91,7 +91,7 @@ class FastqBrowserCLI(CLI):
 			for read_side, ((header, read, qual), amp) in tqdm(interleave(
 				zip(iter_fq(fsq_r1), map_r1),
 				zip(iter_fq(fsq_r2), map_r2),
-			), total=total):
+			), total=2*n_pairs):
 				fields = list(RE_FIELDS.finditer(header))
 				
 				print(

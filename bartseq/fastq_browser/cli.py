@@ -33,7 +33,7 @@ class FastqBrowserCLI(CLI):
 		if args.library is None:
 			libraries = {
 				RE_READ_FILE.fullmatch(p.name)['lib']
-				for p in (args.data_dir / 'in' / 'reads').iterdir()
+				for p in (args.data_dir / 'in' / 'reads').glob('*_R[12]_001.fastq.gz')
 			}
 			if len(libraries) == 1:
 				args.library, = libraries

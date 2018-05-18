@@ -26,6 +26,7 @@ class CLI:
 	
 	@staticmethod
 	def check_args(parser: ArgumentParser, args: Namespace):
+		"""Override to check and optionally modify arguments."""
 		pass
 	
 	@staticmethod

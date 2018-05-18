@@ -27,7 +27,7 @@ def interleave(*iterables):
 
 
 def main(data_dir: Path, library: str, out: Union[Path, str, TextIO], out_compression: str):
-	dir_process = Path(data_dir) / 'process'
+	dir_process = data_dir / 'process'
 	dir_tagged = dir_process / '3-tagged'
 	dir_mapped = dir_process / '4-mapped'
 	

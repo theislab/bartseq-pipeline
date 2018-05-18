@@ -5,10 +5,10 @@ from .read_tagger.cli import ReadTaggerCLI
 from .fastq_browser.cli import FastqBrowserCLI
 
 
-SUBCMDS = {
+SUBCMDS: Dict[str, CLI] = {
 	'tag': ReadTaggerCLI(),
 	'browse': FastqBrowserCLI(),
-}  # type: Dict[str, CLI]
+}
 
 
 cli = DelegatingCLI(SUBCMDS)

@@ -59,7 +59,7 @@ class DelegatingCLI(CLI):
 		return subparser
 	
 	def populate_parser(self, parser: ArgumentParser) -> ArgumentParser:
-		subparsers = parser.add_subparsers()  # type: _SubParsersAction
+		subparsers: _SubParsersAction = parser.add_subparsers()
 		
 		for name, subcmd in self.subcmds.items():
 			self._register_subcommand(subcmd, subparsers.add_parser(name))

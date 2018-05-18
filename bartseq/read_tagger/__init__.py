@@ -12,20 +12,17 @@ from . import defaults
 BASES = set('ATGC')
 
 
-_TaggedReadBase = NamedTuple('_TaggedReadBase', [
-	('header', str),
-	('qual', str),  # Whole qual sequence
-	('len_primer', int),
-	('junk', Optional[str]),
-	('barcode', Optional[str]),
-	('linker', Optional[str]),
-	('amplicon', str),
-	('other_barcodes', FrozenSet[str]),
-	('barcode_mismatch', bool),
-])
-
-
-class TaggedRead(_TaggedReadBase):
+class TaggedRead(NamedTuple):
+	header: str
+	qual: str  # Whole qual sequence
+	len_primer: int
+	junk: Optional[str]
+	barcode: Optional[str]
+	linker: Optional[str]
+	amplicon: str
+	other_barcodes: FrozenSet[str]
+	barcode_mismatch: bool
+	
 	@property
 	def has_multiple_barcodes(self):
 		return len(self.other_barcodes) > 0
@@ -133,7 +130,7 @@ class ReadTagger:
 		# as ordered set
 		matches = OrderedDict((match, None) for match in self.search_barcode(seq_read))
 		
-		match_iter = iter(matches)  # type: Iterator[Tuple[int, int, str]]
+		match_iter:Iterator[Tuple[int, int, str]] = iter(matches) 
 		bc_start, bc_end, barcode = next(match_iter, (None, None, None))
 		
 		bc_id = self.bc_to_id.get(barcode)

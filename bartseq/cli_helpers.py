@@ -82,6 +82,6 @@ def clean_kbdinterrupt(callback):
 	def decorated(*args, **kw):
 		try:
 			return callback(*args, **kw)
-		except KeyboardInterrupt:
+		except (KeyboardInterrupt, BrokenPipeError):
 			pass
 	return decorated

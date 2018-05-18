@@ -1,24 +1,13 @@
 import re
 from argparse import ArgumentParser, Namespace
-from functools import wraps
 from pathlib import Path
 
 from .main import main
 from ..io import openers
-from ..cli_helpers import CLI, t_out_file
+from ..cli_helpers import CLI, t_out_file, clean_kbdinterrupt
 
 
 RE_READ_FILE = re.compile(r'(?P<lib>.+)_R(?P<read>[12])_001\.fastq\.gz')
-
-
-def clean_kbdinterrupt(callback):
-	@wraps(callback)
-	def decorated(*args, **kw):
-		try:
-			return callback(*args, **kw)
-		except KeyboardInterrupt:
-			pass
-	return decorated
 
 
 class FastqBrowserCLI(CLI):

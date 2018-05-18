@@ -1,5 +1,6 @@
 import sys
 from argparse import ArgumentParser, Namespace, _SubParsersAction
+from functools import wraps
 from pathlib import Path
 from typing import Sequence, Dict, Union, TextIO
 
@@ -74,3 +75,13 @@ class DelegatingCLI(CLI):
 			parser.print_help()
 		else:
 			assert False, 'This should never happen'
+
+
+def clean_kbdinterrupt(callback):
+	@wraps(callback)
+	def decorated(*args, **kw):
+		try:
+			return callback(*args, **kw)
+		except KeyboardInterrupt:
+			pass
+	return decorated

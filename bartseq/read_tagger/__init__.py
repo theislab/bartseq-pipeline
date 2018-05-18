@@ -2,10 +2,11 @@ from collections import OrderedDict
 from typing import NamedTuple, Iterable, FrozenSet, Tuple, Optional, Generator, Iterator, Dict, Set
 
 from ahocorasick import Automaton
+from warnings import warn
+
 import pandas as pd
 
 from . import defaults
-from ..logging import log
 
 
 BASES = set('ATGC')
@@ -83,7 +84,7 @@ def get_all_barcodes(
 				bl_item = blacklist.setdefault(pattern, set())
 				bl_item.add((previous_barcode, barcode))
 				bl_item.add((barcode, previous_barcode))
-				log.warning(
+				warn(
 					'Barcodes with one mismatch are ambiguous: '
 					f'Modification {pattern} encountered in '
 					f'barcode {previous_barcode} and {barcode}'
@@ -134,7 +135,9 @@ class ReadTagger:
 		
 		match_iter = iter(matches)  # type: Iterator[Tuple[int, int, str]]
 		bc_start, bc_end, barcode = next(match_iter, (None, None, None))
-		other_barcodes = frozenset(set(bc for _, _, bc in match_iter) - {barcode})
+		
+		bc_id = self.bc_to_id.get(barcode)
+		other_barcodes = frozenset(set(self.bc_to_id[bc] for _, _, bc in match_iter) - {bc_id})
 		
 		if barcode is not None:
 			linker_end = bc_end + self.len_linker if bc_end else None
@@ -150,7 +153,7 @@ class ReadTagger:
 			barcode_mismatch = False
 		
 		read = TaggedRead(
-			header, seq_qual, self.len_primer, junk, self.bc_to_id.get(barcode, None),
+			header, seq_qual, self.len_primer, junk, bc_id,
 			linker, amplicon, other_barcodes, barcode_mismatch,
 		)
 		

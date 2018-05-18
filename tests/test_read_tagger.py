@@ -1,4 +1,4 @@
-from pytest import raises
+from pytest import warns
 
 from bartseq.read_tagger import get_mismatches, ReadTagger, TaggedRead
 
@@ -14,6 +14,8 @@ expected_2 = [
 	'Ab', 'Tb', 'Gb', 'Cb',
 	'aA', 'aT', 'aG', 'aC',
 ]
+
+qual_9 = '!' * 9
 
 
 def test_get_mismatches_2():
@@ -33,7 +35,7 @@ def test_get_mismatches_3():
 
 
 def test_search_barcode():
-	tagger = ReadTagger(['ab'])
+	tagger = ReadTagger(dict(ab='A'), 1, 1)
 	assert {'ab'} == set(tagger.automaton.values())
 	assert set(expected_2) == set(tagger.automaton.keys())
 	
@@ -45,28 +47,28 @@ def test_search_barcode():
 
 
 def test_tagger_ambiguous_barcodes():
-	with raises(ValueError, match='ambiguous.*in barcode ab and ac'):
-		ReadTagger(['ab', 'ac'])
+	with warns(UserWarning, match='ambiguous.*in barcode ab and ac'):
+		ReadTagger(dict(ab='A', ac='B'), 1, 1)
 
 
 def test_tag_read_find1():
-	tagger = ReadTagger(['ab'])
+	tagger = ReadTagger(dict(ab='A'), 1, 1)
 	
-	assert tagger.tag_read('XXabblah') == TaggedRead('XX', 'ab', 'blah', frozenset())
-	assert tagger.tag_read('abblahXX') == TaggedRead(None, 'ab', 'blahXX', frozenset())
-	assert tagger.tag_read('XXbvblah') == TaggedRead(None, None, 'XXbvblah', frozenset())
+	assert tagger.tag_read('a', 'XXabLblah', qual_9) == TaggedRead('a', qual_9, 1, 'XX', 'A', 'L', 'blah', frozenset(), False)
+	assert tagger.tag_read('b', 'abLblahXX', qual_9) == TaggedRead('b', qual_9, 1, None, 'A', 'L', 'blahXX', frozenset(), False)
+	assert tagger.tag_read('c', 'XXbvblahL', qual_9) == TaggedRead('c', qual_9, 1, None, None, None, 'XXbvblahL', frozenset(), False)
 	# two occurrences
-	assert tagger.tag_read('XXabblab') == TaggedRead('XX', 'ab', 'blab', frozenset())
+	assert tagger.tag_read('d', 'XXabLblab', qual_9) == TaggedRead('d', qual_9, 1, 'XX', 'A', 'L', 'blab', frozenset(), False)
 
 
 def test_tag_read_find_mismatch():
-	tagger = ReadTagger(['ab'])
+	tagger = ReadTagger(dict(ab='A'), 1, 1)
 	
-	assert tagger.tag_read('XXaGblah') == TaggedRead('XX', 'ab', 'blah', frozenset())
+	assert tagger.tag_read('a', 'XXaGLblah', qual_9) == TaggedRead('a', qual_9, 1, 'XX', 'A', 'L', 'blah', frozenset(), True)
 	# two occurrences
-	assert tagger.tag_read('XXaGblab') == TaggedRead('XX', 'ab', 'blab', frozenset())
+	assert tagger.tag_read('b', 'XXaGLblab', qual_9) == TaggedRead('b', qual_9, 1, 'XX', 'A', 'L', 'blab', frozenset(), True)
 
 
 def test_tag_read_find2():
-	tagger = ReadTagger(['ab', 'bx'])
-	assert tagger.tag_read('XXabxblah') == TaggedRead('XX', 'ab', 'xblah', frozenset({'bx'}))
+	tagger = ReadTagger(dict(ab='A', bL='B'), 1, 1)
+	assert tagger.tag_read('a', 'XXabLxblah', qual_9) == TaggedRead('a', qual_9, 1, 'XX', 'A', 'L', 'xblah', frozenset({'B'}), False)

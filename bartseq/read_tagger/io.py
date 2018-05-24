@@ -9,6 +9,7 @@ def write_bc_table(path_bc_file: Union[Path, str], path_bc_table: Union[Path, st
 	"""This is mainly independent of the rest, so do simple duplicate work to be able to create this separately"""
 	from . import get_tagger
 	bc_table = get_tagger(read_fasta(path_bc_file)).get_barcode_table()
+	Path(path_bc_table).parent.mkdir(parents=True, exist_ok=True)
 	with transparent_open(path_bc_table, 'wt') as f_bc:
 		f_bc.write(bc_table)
 

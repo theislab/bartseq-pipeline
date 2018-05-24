@@ -16,6 +16,7 @@ from plotnine import facet_wrap, theme, element_text
 
 from bartseq.io import transparent_open
 from bartseq.read_tagger.io import write_bc_table
+from bartseq.heatmaps import plot_counts
 
 min_version('4.5.1')
 

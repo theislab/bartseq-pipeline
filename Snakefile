@@ -16,16 +16,22 @@ from plotnine import facet_wrap, theme, element_text
 
 from bartseq.io import transparent_open
 from bartseq.read_tagger.io import write_bc_table
+from bartseq.read_tagger.defaults import len_linker
 from bartseq.heatmaps import plot_counts
 
 min_version('4.5.1')
 
 EMPTY_PNG = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x04\x00\x00\x00\xb5\x1c\x0c\x02\x00\x00\x00\x0bIDATx\xdacd`\x00\x00\x00\x06\x00\x020\x81\xd0/\x00\x00\x00\x00IEND\xaeB`\x82'
 
-
 with open('in/amplicons.fa') as a_f:
-	amplicons = [line.lstrip('>').strip() for line in a_f.readlines() if line.startswith('>')]
+	amplicons = [line.lstrip('>').strip() for line in a_f if line.startswith('>')]
 	amplicons += ['unmapped', 'one-mapped']
+
+with open('in/barcodes.fa') as a_f:
+	len_barcode = max(len(line.strip()) for line in a_f if not line.startswith('>'))
+
+len_protection = 3
+len_3prime_junk = len_linker + len_barcode + len_protection
 
 dir_qc = 'out/qc'
 amplicon_index_stem = 'process/1-index/amplicons'
@@ -177,6 +183,7 @@ rule map_reads:
 			--threads {threads} \
 			--reorder \
 			-k 1 \
+			-3 {len_3prime_junk} \
 			-x {amplicon_index_stem:q} \
 			--new-summary --summary-file {output.summary:q} \
 			-q -U {input.read:q} | \

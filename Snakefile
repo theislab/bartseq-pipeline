@@ -127,8 +127,7 @@ rule tag_reads:
 		stats_file='process/3-tagged/{lib_name}_stats.json',
 	run:
 		from bartseq.read_tagger.main import run
-		with open(input.count_file) as c_f:
-			total = int(c_f.read())
+		total = int(Path(input.count_file).read_text('utf-8'))
 		run(
 			in_1=input[0], out_1=output[0],
 			in_2=input[1], out_2=output[1],
@@ -142,15 +141,14 @@ rule tag_stats:
 		expand('process/3-tagged/{lib_name}_stats.json', lib_name=lib_names)
 	run:
 		for path in input:
-			with open(path) as f:
-				stats = json.load(f)
-				print(path)
-				print('', 'n_reads', stats['n_reads'], sep='\t')
-				print('', 'both_regular', '{:.1%}'.format(stats['n_both_regular'] / stats['n_reads']), sep='\t')
-				for read in ['read1', 'read2']:
-					print('', read, sep='\t')
-					for stat, count in stats[read].items():
-						print('', '', stat[2:], '{:.1%}'.format(count / stats['n_reads']), sep='\t')
+			stats = json.loads(Path(path).read_bytes())
+			print(path)
+			print('', 'n_reads', stats['n_reads'], sep='\t')
+			print('', 'both_regular', '{:.1%}'.format(stats['n_both_regular'] / stats['n_reads']), sep='\t')
+			for read in ['read1', 'read2']:
+				print('', read, sep='\t')
+				for stat, count in stats[read].items():
+					print('', '', stat[2:], '{:.1%}'.format(count / stats['n_reads']), sep='\t')
 
 # Helper rule for Lukas’ pipeline file
 rule amplicon_fa:
@@ -201,8 +199,7 @@ rule count:
 		expand('process/5-counts/{counting}/{{lib_name}}_001.tsv', counting=['both', 'one'])
 	run:
 		bc_re = re.compile(r'barcode=(\w+)')
-		with open(input.stats_file) as s_f:
-			total = json.load(s_f)['n_both_regular']
+		total = json.loads(Path(input.stats_file).read_bytes())['n_both_regular']
 		def get_barcodes(fastq_file):
 			for header in fastq_file:
 				next(fastq_file)
@@ -283,8 +280,7 @@ rule plot_counts:
 		counts = counts_na[~counts_na.Count.isna()].copy()
 		
 		if counts.shape[0] <= 2:
-			with open(output[0], 'wb') as empty:
-				empty.write(EMPTY_PNG)
+			Path(output[0]).write_bytes(EMPTY_PNG)
 			return
 		
 		gg = plot_counts(counts) + \
@@ -318,23 +314,44 @@ rule count_symlink:
 	shell:
 		'ln -sf ../../../../../{input:q} {output:q}'
 
+re_summary = re.compile(r'''HISAT2 summary stats:
+	Total reads: (?P<total>\d+)
+		Aligned 0 time: (?P<zero>\d+) \(\d+\.\d+%\)
+		Aligned 1 time: (?P<one>\d+) \(\d+\.\d+%\)
+		Aligned >1 times: (?P<more>\d+) \(\d+\.\d+%\)
+	Overall alignment rate: \d+\.\d+%''')
+
 rule spreadsheet:
 	input:
-		expand('out/counts/{{counting}}/{amplicon}/bylib/{amplicon}-{lib_name}.tsv', amplicon=amplicons, lib_name=lib_names)
+		summaries = expand('process/4-mapped/{lib_name}_R{read}_001_summary.txt', lib_name=lib_names, read=[1,2]),
+		counts = expand('out/counts/{{counting}}/{amplicon}/bylib/{amplicon}-{lib_name}.tsv', amplicon=amplicons, lib_name=lib_names),
 	output:
 		'out/counts/{counting}/{counting}.xlsx'
 	run:
 		import openpyxl
 		from openpyxl.utils.dataframe import dataframe_to_rows
 		
-		re_name = re.compile(format('^{re_amplicon}-{re_lib_name}\.tsv$'))
+		re_name = re.compile(format('{re_amplicon}-{re_lib_name}\.tsv'))
 		tables_all = {
-			tuple(re_name.match(Path(i).name).groups()):
-			pd.read_csv(i, '\t') for i in input
+			tuple(re_name.fullmatch(Path(i).name).groups()):
+			pd.read_csv(i, '\t') for i in input.counts
 		}
 		
 		wb = openpyxl.Workbook()
-		wb.remove(wb.active)
+		wb.active.title = 'Statistics'
+		
+		stats = ['total', 'zero', 'one', 'more']
+		wb.active.cell(1, 1).value = 'library'
+		for c, stat in enumerate(stats, 2):
+			wb.active.cell(1, c).value = stat
+		for r, path in enumerate(input.summaries, 2):
+			path = Path(path)
+			stats_txt = path.read_text('utf-8')
+			stats_match = re_summary.match(stats_txt)
+			wb.active.cell(r, 1).value = path.with_suffix('').name
+			for c, stat in enumerate(stats, 2):
+				wb.active.cell(r, c).value = stats_match[stat]
+		
 		for lib in lib_names:
 			tables_lib = {amp: table for (amp, l), table in tables_all.items() if l == lib}
 			counts = amp_tables_to_counts(tables_lib)

@@ -25,7 +25,7 @@ EMPTY_PNG = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x0
 
 with open('in/amplicons.fa') as a_f:
 	amplicons = [line.lstrip('>').strip() for line in a_f if line.startswith('>')]
-	amplicons += ['unmapped', 'one-mapped']
+	amplicons += ['-unmapped', '-one-mapped', '-mismatch']
 
 with open('in/barcodes.fa') as a_f:
 	len_barcode = max(len(line.strip()) for line in a_f if not line.startswith('>'))
@@ -60,6 +60,7 @@ re_matrix = format('({re_amplicon}|bylib/{re_amplicon}-{re_lib_name})')
 
 wildcard_constraints:
 	which = '(-all|)',
+	counting = '(both|one)',
 	amplicon = re_amplicon,
 	lib_name = re_lib_name,
 	matrix = re_matrix,
@@ -68,11 +69,11 @@ wildcard_constraints:
 rule all:
 	input:
 		get_read_paths('out/qc', '_fastqc.html', '_fastqc.zip'),
-		expand('out/counts/{amplicon}/{amplicon}{which}-log.png', amplicon=amplicons, which=['-all', '']),
-		expand('out/counts/{amplicon}/bylib/{amplicon}-{lib_name}{which}-log.png', amplicon=amplicons, lib_name=lib_names, which=['-all', '']),
-		expand('out/counts/bylib/{lib_name}/{amplicon}{which}-log.png', lib_name=lib_names, amplicon=amplicons, which=['-all', '']),
-		'out/counts/all.png',
-		'out/counts/all.xlsx',
+		expand('out/counts/{counting}/{amplicon}/{amplicon}{which}-log.png', counting=['both', 'one'], amplicon=amplicons, which=['-all', '']),
+		expand('out/counts/{counting}/{amplicon}/bylib/{amplicon}-{lib_name}{which}-log.png', counting=['both', 'one'], amplicon=amplicons, lib_name=lib_names, which=['-all', '']),
+		expand('out/counts/{counting}/bylib/{lib_name}/{amplicon}{which}-log.png', counting=['both', 'one'], lib_name=lib_names, amplicon=amplicons, which=['-all', '']),
+		expand('out/counts/{counting}/{counting}.png', counting=['both', 'one']),
+		expand('out/counts/{counting}/{counting}.xlsx', counting=['both', 'one']),
 		'out/barcodes.htm',
 
 rule get_qc:
@@ -197,7 +198,7 @@ rule count:
 		mappings = expand('process/4-mapped/{{lib_name}}_R{read}_001.txt', read=[1,2]),
 		stats_file = 'process/3-tagged/{lib_name}_stats.json'
 	output:
-		'process/5-counts/{lib_name}_001.tsv'
+		expand('process/5-counts/{counting}/{{lib_name}}_001.tsv', counting=['both', 'one'])
 	run:
 		bc_re = re.compile(r'barcode=(\w+)')
 		with open(input.stats_file) as s_f:
@@ -209,6 +210,7 @@ rule count:
 				next(fastq_file)
 				yield bc_re.search(header).group(1)
 		counts = Counter()
+		counts_one = Counter()
 		with \
 			transparent_open(input.reads[0]) as r1, open(input.mappings[0]) as a1, \
 			transparent_open(input.reads[1]) as r2, open(input.mappings[1]) as a2:
@@ -220,20 +222,28 @@ rule count:
 			for bc1, bc2, amp1, amp2 in tqdm(zip(bcs1, bcs2, amps1, amps2), total=total):
 				bc1, bc2 = sorted([bc1, bc2])
 				if amp1 == amp2:
-					counts[bc1, bc2, 'unmapped' if amp1 == '*' else amp1] += 1
+					if amp1 == '*':
+						counts[bc1, bc2, '-unmapped'] += 1
+					else:
+						counts[bc1, bc2, amp1] += 1
+						counts_one[bc1, bc2, amp1] += 1
+				elif amp1 == '*':
+					counts[bc1, bc2, '-one-mapped'] += 1
+					counts_one[bc1, bc2, amp2] += 1  # amp1 == '*'
 				else:
-					counts[bc1, bc2, 'one-mapped'] += 1
+					counts[bc1, bc2, '-mismatch'] += 1
 			
-			with open(output[0], 'w') as of:
-				print('bc_l', 'bc_r', 'amp', 'count', sep='\t', file=of)
-				for fields, c in counts.items():
-					print(*fields, c, sep='\t', file=of)
+			for path, counter in zip(output, [counts, counts_one]):
+				with open(path, 'w') as of:
+					print('bc_l', 'bc_r', 'amp', 'count', sep='\t', file=of)
+					for fields, c in counter.items():
+						print(*fields, c, sep='\t', file=of)
 
 rule amplicon_counts_lib_all:
 	input:
-		'process/5-counts/{lib_name}_001.tsv'
+		'process/5-counts/{counting}/{lib_name}_001.tsv'
 	output:
-		'out/counts/{amplicon}/bylib/{amplicon}-{lib_name}-all.tsv'
+		'out/counts/{counting}/{amplicon}/bylib/{amplicon}-{lib_name}-all.tsv'
 	run:
 		entries_lib = pd.read_csv(input[0], '\t')
 		entries = entries_lib[entries_lib.amp == wildcards.amplicon].drop(columns=['amp'])
@@ -242,18 +252,18 @@ rule amplicon_counts_lib_all:
 
 rule amplicon_counts_all:
 	input:
-		expand('out/counts/{{amplicon}}/bylib/{{amplicon}}-{lib_name}-all.tsv', lib_name=lib_names)
+		expand('out/counts/{{counting}}/{{amplicon}}/bylib/{{amplicon}}-{lib_name}-all.tsv', lib_name=lib_names)
 	output:
-		'out/counts/{amplicon}/{amplicon}-all.tsv'
+		'out/counts/{counting}/{amplicon}/{amplicon}-all.tsv'
 	run:
 		table = reduce(add, [pd.read_csv(f, '\t', index_col='bc_l') for f in input])
 		table.to_csv(output[0], '\t')
 
 rule amplicon_counts:
 	input:
-		'out/counts/{amplicon}/{matrix}-all.tsv'
+		'out/counts/{counting}/{amplicon}/{matrix}-all.tsv'
 	output:
-		'out/counts/{amplicon}/{matrix}.tsv'
+		'out/counts/{counting}/{amplicon}/{matrix}.tsv'
 	run:
 		table_all = pd.read_csv(input[0], '\t', index_col='bc_l')
 		if table_all.shape == (0, 0):  # here, the empty index can’t use str methods
@@ -264,9 +274,9 @@ rule amplicon_counts:
 
 rule plot_counts:
 	input:
-		'out/counts/{amplicon}/{matrix}{which}.tsv'
+		'out/counts/{counting}/{amplicon}/{matrix}{which}.tsv'
 	output:
-		'out/counts/{amplicon}/{matrix}{which}-log.png'
+		'out/counts/{counting}/{amplicon}/{matrix}{which}-log.png'
 	run:
 		counts_long = pd.read_csv(input[0], '\t')
 		counts_na = counts_long.melt(['bc_l'], var_name='bc_r', value_name='Count')
@@ -288,9 +298,9 @@ def amp_tables_to_counts(tables: Dict[str, pd.DataFrame]):
 
 rule plot_counts_all:
 	input:
-		expand('out/counts/{amplicon}/{amplicon}.tsv', amplicon=amplicons)
+		expand('out/counts/{{counting}}/{amplicon}/{amplicon}.tsv', amplicon=amplicons)
 	output:
-		expand('out/counts/all.png')
+		'out/counts/{counting}/{counting}.png'
 	run:
 		tables = {Path(i).parent.name: pd.read_csv(i, '\t') for i in input}
 		counts = amp_tables_to_counts(tables)
@@ -302,17 +312,17 @@ rule plot_counts_all:
 
 rule count_symlink:
 	input:
-		'out/counts/{amplicon}/bylib/{amplicon}-{lib_name}{which}-log.png'
+		'out/counts/{counting}/{amplicon}/bylib/{amplicon}-{lib_name}{which}-log.png'
 	output:
-		'out/counts/bylib/{lib_name}/{amplicon}{which}-log.png'
+		'out/counts/{counting}/bylib/{lib_name}/{amplicon}{which}-log.png'
 	shell:
-		'ln -sf ../../../../{input:q} {output:q}'
+		'ln -sf ../../../../../{input:q} {output:q}'
 
 rule spreadsheet:
 	input:
-		expand('out/counts/{amplicon}/bylib/{amplicon}-{lib_name}.tsv', amplicon=amplicons, lib_name=lib_names)
+		expand('out/counts/{{counting}}/{amplicon}/bylib/{amplicon}-{lib_name}.tsv', amplicon=amplicons, lib_name=lib_names)
 	output:
-		'out/counts/all.xlsx'
+		'out/counts/{counting}/{counting}.xlsx'
 	run:
 		import openpyxl
 		from openpyxl.utils.dataframe import dataframe_to_rows

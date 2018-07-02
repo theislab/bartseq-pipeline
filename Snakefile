@@ -27,7 +27,7 @@ dir_qc = 'out/qc'
 amplicon_index_stem = 'process/1-index/amplicons'
 amplicon_index_files = expand('{stem}/{{lib_name}}.{n}.ht2', stem=amplicon_index_stem, n=range(1, 9))
 all_reads_in = [(w.readname, w.read) for _, w in listfiles('in/reads/{readname}_R{read,[12]}_001.fastq.gz')]
-lib_names = [readname for readname, read in all_reads_in if read == '1']
+lib_names = sorted([readname for readname, read in all_reads_in if read == '1'])
 
 def get_input_seq_paths(dir_):
 	by_lib = Path('in', dir_).is_dir()
@@ -53,7 +53,7 @@ len_protection = 3
 len_3prime_junk = len_linker + len_barcode + len_protection
 
 def get_read_path(prefix, name, read, suffix='.fastq.gz'):
-	return '{prefix}/{name}_R{read}{suffix}'.format_map(locals())
+	return '{prefix}/{name}_R{read}_001{suffix}'.format_map(locals())
 
 def get_read_paths(prefix, *suffixes):
 	if len(suffixes) == 0:
@@ -88,15 +88,16 @@ rule all:
 				counting=['both', 'one'], lib_name=lib_name, amplicon=amps, which=['-all', ''],
 			)
 		],
-		expand('out/counts/{counting}/{counting}{which}-log.png', counting=['both', 'one'], which=['-all', '']),
+		expand('out/counts/{counting}/{lib_name}/{lib_name}{which}-log.png', counting=['both', 'one'], lib_name=lib_names, which=['-all', '']),
+		#expand('out/counts/{counting}/{counting}{which}-log.png', counting=['both', 'one'], which=['-all', '']),
 		expand('out/counts/{counting}/{counting}.xlsx', counting=['both', 'one']),
 		'out/barcodes.htm',
 
 rule get_qc:
 	input:
-		'in/reads/{name_full}_001.fastq.gz'
+		'in/reads/{name_full}.fastq.gz'
 	output:
-		expand('{dir_qc}/{{name_full}}_fastqc{suffix}', dir_qc=[dir_qc], suffix=['.html', '.zip'])
+		expand('{dir_qc}/{{name_full}}_fastqc{suffix}', dir_qc=dir_qc, suffix=['.html', '.zip'])
 	shell:
 		'fastqc {input:q} -o {dir_qc:q}'
 
@@ -303,9 +304,9 @@ rule amplicon_counts:
 
 rule plot_counts:
 	input:
-		'out/counts/{counting}/{matrix}{which}.tsv'
+		'out/counts/{counting}/{lib_name}/{amplicon}/{lib_name}-{amplicon}{which}.tsv'
 	output:
-		'out/counts/{counting}/{matrix}{which}-log.png'
+		'out/counts/{counting}/{lib_name}/{amplicon}/{lib_name}-{amplicon}{which}-log.png'
 	run:
 		counts_long = pd.read_csv(input[0], '\t')
 		counts_na = counts_long.melt(['bc_l'], var_name='bc_r', value_name='Count')
@@ -376,18 +377,20 @@ rule spreadsheet:
 		
 		stats = ['total', 'zero', 'one', 'more']
 		wb.active.cell(1, 1).value = 'library'
-		for c, stat in enumerate(stats, 2):
+		wb.active.cell(1, 2).value = 'read'
+		for c, stat in enumerate(stats, 3):
 			wb.active.cell(1, c).value = stat
 		for r, path in enumerate(input.summaries, 2):
 			path = Path(path)
 			stats_txt = path.read_text('utf-8')
 			stats_match = re_summary.match(stats_txt)
-			wb.active.cell(r, 1).value = path.with_suffix('').name
-			for c, stat in enumerate(stats, 2):
+			wb.active.cell(r, 1).value = re.sub(r'_R[12]_summary.txt$', '', path.name)
+			wb.active.cell(r, 2).value = int(re.fullmatch(r'.*_R([12])_summary.txt', path.name)[1])
+			for c, stat in enumerate(stats, 3):
 				wb.active.cell(r, c).value = stats_match[stat]
 		
 		for lib in lib_names:
-			tables_lib = {amp: table for (amp, l), table in tables_all.items() if l == lib}
+			tables_lib = {amp: table for (l, amp), table in tables_all.items() if l == lib}
 			counts = amp_tables_to_counts(tables_lib)
 			sheet = counts.pivot_table('Count', ['bc_l', 'bc_r'], 'Amplicon').reset_index().fillna(0)
 			

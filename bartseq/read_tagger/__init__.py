@@ -11,6 +11,26 @@ from . import defaults
 
 BASES = set('ATGC')
 
+HTML_INTRO = f'''\
+<!doctype html>
+<meta charset="utf-8">
+<style>
+body  {{ font-size: 12px }}
+table {{ border-collapse: collapse }}
+th:empty,
+table {{ border: none }}
+th, td {{ border: 1px solid rgba(0,0,0,.2); padding: 5px }}
+thead, tbody th {{ position: sticky }}
+
+thead th,
+.a    {{ color: #FF6AD5 }}
+tbody th,
+.b    {{ color: #AD8CFF }}
+td    {{ color: #94D0FF }}
+.both {{ color: red }}
+</style>
+'''
+
 
 class TaggedRead(NamedTuple):
 	header: str
@@ -164,7 +184,7 @@ class ReadTagger:
 		
 		return read
 	
-	def get_barcode_table(self):
+	def get_barcode_table(self, plain=False):
 		cell_templates = {
 			(True, True): '{}',
 			(True, False): '<span class="b">{}</span>',
@@ -184,26 +204,9 @@ class ReadTagger:
 		with pd.option_context('display.max_colwidth', -1):
 			html = sprs.to_html(escape=False, na_rep='')
 		
-		return f'''\
-<!doctype html>
-<meta charset="utf-8">
-<style>
-body  {{ font-size: 12px }}
-table {{ border-collapse: collapse }}
-th:empty,
-table {{ border: none }}
-th, td {{ border: 1px solid rgba(0,0,0,.2); padding: 5px }}
-thead, tbody th {{ position: sticky }}
-
-thead th,
-.a    {{ color: #FF6AD5 }}
-tbody th,
-.b    {{ color: #AD8CFF }}
-td    {{ color: #94D0FF }}
-.both {{ color: red }}
-</style>
-{html}
-'''
+		if plain:
+			return html
+		return HTML_INTRO + html
 
 
 def get_tagger(

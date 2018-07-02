@@ -15,7 +15,7 @@ matplotlib.rcParams['backend'] = 'agg'  # make pypy work without Qt
 from plotnine import facet_wrap, theme, element_text
 
 from bartseq.io import transparent_open
-from bartseq.read_tagger.io import write_bc_table
+from bartseq.read_tagger.io import write_bc_tables
 from bartseq.read_tagger.defaults import len_linker
 from bartseq.heatmaps import plot_counts
 
@@ -23,24 +23,37 @@ min_version('4.5.1')
 
 EMPTY_PNG = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x04\x00\x00\x00\xb5\x1c\x0c\x02\x00\x00\x00\x0bIDATx\xdacd`\x00\x00\x00\x06\x00\x020\x81\xd0/\x00\x00\x00\x00IEND\xaeB`\x82'
 
-with open('in/amplicons.fa') as a_f:
-	amplicons = [line.lstrip('>').strip() for line in a_f if line.startswith('>')]
-	amplicons += ['-unmapped', '-one-mapped', '-mismatch']
+dir_qc = 'out/qc'
+amplicon_index_stem = 'process/1-index/amplicons'
+amplicon_index_files = expand('{stem}/{{lib_name}}.{n}.ht2', stem=amplicon_index_stem, n=range(1, 9))
+all_reads_in = [(w.readname, w.read) for _, w in listfiles('in/reads/{readname}_R{read,[12]}_001.fastq.gz')]
+lib_names = [readname for readname, read in all_reads_in if read == '1']
 
-with open('in/barcodes.fa') as a_f:
-	len_barcode = max(len(line.strip()) for line in a_f if not line.startswith('>'))
+def get_input_seq_paths(dir_):
+	by_lib = Path('in', dir_).is_dir()
+	for lib in lib_names:
+		if by_lib:
+			yield lib, Path('in', dir_, lib + '.fa')
+		else:
+			yield lib, Path('in', dir_+'.fa')
+
+amplicons = {
+	lib: [line.lstrip('>') for line in path.read_text().splitlines() if line.startswith('>')] + ['-unmapped', '-one-mapped', '-mismatch']
+	for lib, path in get_input_seq_paths('amplicons')
+}
+
+len_barcode = max(
+	len(line)
+	for _, path in get_input_seq_paths('barcodes')
+	for line in path.read_text().splitlines()
+	if not line.startswith('>')
+)
 
 len_protection = 3
 len_3prime_junk = len_linker + len_barcode + len_protection
 
-dir_qc = 'out/qc'
-amplicon_index_stem = 'process/1-index/amplicons'
-amplicon_index_files = expand('{stem}.{n}.ht2', stem=[amplicon_index_stem], n=range(1, 9))
-all_reads_in = [(w.readname, w.read) for _, w in listfiles('in/reads/{readname}_R{read,[12]}_001.fastq.gz')]
-lib_names = [readname for readname, read in all_reads_in if read == '1']
-
 def get_read_path(prefix, name, read, suffix='.fastq.gz'):
-	return '{prefix}/{name}_R{read}_001{suffix}'.format_map(locals())
+	return '{prefix}/{name}_R{read}{suffix}'.format_map(locals())
 
 def get_read_paths(prefix, *suffixes):
 	if len(suffixes) == 0:
@@ -51,11 +64,9 @@ def get_read_paths(prefix, *suffixes):
 		for suffix in suffixes
 	]
 
-reads_raw = get_read_paths('rawdata')
-
-re_amplicon = '({})'.format('|'.join(re.escape(a) for a in amplicons))
+re_amplicon = '({})'.format('|'.join(re.escape(a) for a in set(a for amps in amplicons.values() for a in amps)))
 re_lib_name = '({})'.format('|'.join(re.escape(ln) for ln in lib_names))
-re_matrix = format('({re_amplicon}|bylib/{re_amplicon}-{re_lib_name})')
+re_matrix = '(both|one|{re_lib_name}/({re_lib_name}|{re_amplicon}/{re_lib_name}-{re_amplicon}))'.format(re_amplicon=re_amplicon, re_lib_name=re_lib_name)
 
 
 wildcard_constraints:
@@ -69,16 +80,21 @@ wildcard_constraints:
 rule all:
 	input:
 		get_read_paths('out/qc', '_fastqc.html', '_fastqc.zip'),
-		expand('out/counts/{counting}/{amplicon}/{amplicon}{which}-log.png', counting=['both', 'one'], amplicon=amplicons, which=['-all', '']),
-		expand('out/counts/{counting}/{amplicon}/bylib/{amplicon}-{lib_name}{which}-log.png', counting=['both', 'one'], amplicon=amplicons, lib_name=lib_names, which=['-all', '']),
-		expand('out/counts/{counting}/bylib/{lib_name}/{amplicon}{which}-log.png', counting=['both', 'one'], lib_name=lib_names, amplicon=amplicons, which=['-all', '']),
-		expand('out/counts/{counting}/{counting}.png', counting=['both', 'one']),
+		[
+			path
+			for lib_name, amps in amplicons.items()
+			for path in expand(
+				'out/counts/{counting}/{lib_name}/{amplicon}/{lib_name}-{amplicon}{which}-log.png',
+				counting=['both', 'one'], lib_name=lib_name, amplicon=amps, which=['-all', ''],
+			)
+		],
+		expand('out/counts/{counting}/{counting}{which}-log.png', counting=['both', 'one'], which=['-all', '']),
 		expand('out/counts/{counting}/{counting}.xlsx', counting=['both', 'one']),
 		'out/barcodes.htm',
 
 rule get_qc:
 	input:
-		'in/reads/{name_full}.fastq.gz'
+		'in/reads/{name_full}_001.fastq.gz'
 	output:
 		expand('{dir_qc}/{{name_full}}_fastqc{suffix}', dir_qc=[dir_qc], suffix=['.html', '.zip'])
 	shell:
@@ -88,19 +104,29 @@ rule get_read_count:
 	input:
 		'in/reads/{lib_name}_R1_001.fastq.gz'
 	output:
-		'process/1-index/{lib_name}_001.count.txt'
+		'process/1-index/{lib_name}.count.txt'
 	shell:
 		'''
 		lines=$(zcat {input:q} | wc -l)
 		echo "$lines / 4" | bc > {output:q}
 		'''
 
+rule seqs_by_lib:
+	input:  'in/{seqs_type}/{lib_name}.fa'
+	output: 'process/1-index/{seqs_type}/{lib_name}.fa'
+	shell:  'cp -T {input:q} {output:q}'
+
+rule seqs_universal:
+	input:  'in/{seqs_type}.fa'
+	output: 'process/1-index/{seqs_type}/{lib_name}.fa'
+	shell:  'cp -T {input:q} {output:q}'
+
 rule trim_quality:
 	input:
 		expand('in/reads/{{lib_name}}_R{read}_001.fastq.gz', read=[1,2]),
 	output:
-		expand('process/2-trimmed/{{lib_name}}_R{read}_001.fastq.gz', read=[1,2]),
-		single = 'process/2-trimmed/{lib_name}_single_001.fastq.gz',
+		expand('process/2-trimmed/{{lib_name}}_R{read}.fastq.gz', read=[1,2]),
+		single = 'process/2-trimmed/{lib_name}_single.fastq.gz',
 	shell:
 		'''
 		sickle pe --gzip-output --qual-type=sanger \
@@ -111,19 +137,19 @@ rule trim_quality:
 
 rule bc_table:
 	input:
-		'in/barcodes.fa'
+		expand('process/1-index/barcodes/{lib_name}.fa', lib_name=lib_names)
 	output:
 		'out/barcodes.htm'
 	run:
-		write_bc_table(input[0], output[0])
+		write_bc_tables(input, output[0])
 
 rule tag_reads:
 	input:
-		expand('process/2-trimmed/{{lib_name}}_R{read}_001.fastq.gz', read=[1,2]),
-		count_file = 'process/1-index/{lib_name}_001.count.txt',
-		bc_file = 'in/barcodes.fa',
+		expand('process/2-trimmed/{{lib_name}}_R{read}.fastq.gz', read=[1,2]),
+		count_file = 'process/1-index/{lib_name}.count.txt',
+		bc_file = 'process/1-index/barcodes/{lib_name}.fa',
 	output:
-		expand('process/3-tagged/{{lib_name}}_R{read}_001.fastq.gz', read=[1,2]),
+		expand('process/3-tagged/{{lib_name}}_R{read}.fastq.gz', read=[1,2]),
 		stats_file='process/3-tagged/{lib_name}_stats.json',
 	run:
 		from bartseq.read_tagger.main import run
@@ -150,31 +176,22 @@ rule tag_stats:
 				for stat, count in stats[read].items():
 					print('', '', stat[2:], '{:.1%}'.format(count / stats['n_reads']), sep='\t')
 
-# Helper rule for Lukas’ pipeline file
-rule amplicon_fa:
-	input:
-		'in/amplicons.txt'
-	output:
-		'in/amplicons.fa'
-	shell:
-		r"cat {input:q} | tail -n +2 | cut -f 1,4 | sed 's/^ */>/;s/\t/\n/' > {output:q}"
-
 rule build_index:
 	input:
-		'in/amplicons.fa'
+		'process/1-index/amplicons/{lib_name}.fa'
 	output:
 		idx = amplicon_index_files,
 	threads: 4
 	shell:
-		'hisat2-build -p {threads} {input:q} {amplicon_index_stem:q}'
+		'hisat2-build -p {threads} {input:q} {amplicon_index_stem:q}/{wildcards.lib_name:q}'
 
 rule map_reads:
 	input:
 		amplicons = amplicon_index_files,
-		read = 'process/3-tagged/{name_full}.fastq.gz',
+		read = 'process/3-tagged/{lib_name}_R{read}.fastq.gz',
 	output:
-		map = 'process/4-mapped/{name_full}.txt',
-		summary = 'process/4-mapped/{name_full}_summary.txt'
+		map = 'process/4-mapped/{lib_name}_R{read}.txt',
+		summary = 'process/4-mapped/{lib_name}_R{read}_summary.txt'
 	threads: 4
 	shell:
 		'''
@@ -183,7 +200,7 @@ rule map_reads:
 			--reorder \
 			-k 1 \
 			-3 {len_3prime_junk} \
-			-x {amplicon_index_stem:q} \
+			-x {amplicon_index_stem:q}/{wildcards.lib_name:q} \
 			--new-summary --summary-file {output.summary:q} \
 			-q -U {input.read:q} | \
 			grep -v "^@" - | \
@@ -192,11 +209,11 @@ rule map_reads:
 
 rule count:
 	input:
-		reads = expand('process/3-tagged/{{lib_name}}_R{read}_001.fastq.gz', read=[1,2]),
-		mappings = expand('process/4-mapped/{{lib_name}}_R{read}_001.txt', read=[1,2]),
+		reads = expand('process/3-tagged/{{lib_name}}_R{read}.fastq.gz', read=[1,2]),
+		mappings = expand('process/4-mapped/{{lib_name}}_R{read}.txt', read=[1,2]),
 		stats_file = 'process/3-tagged/{lib_name}_stats.json'
 	output:
-		expand('process/5-counts/{counting}/{{lib_name}}_001.tsv', counting=['both', 'one'])
+		expand('process/5-counts/{counting}/{{lib_name}}.tsv', counting=['both', 'one'])
 	run:
 		bc_re = re.compile(r'barcode=(\w+)')
 		total = json.loads(Path(input.stats_file).read_bytes())['n_both_regular']
@@ -236,31 +253,46 @@ rule count:
 					for fields, c in counter.items():
 						print(*fields, c, sep='\t', file=of)
 
-rule amplicon_counts_lib_all:
+rule amplicon_counts_all:
 	input:
-		'process/5-counts/{counting}/{lib_name}_001.tsv'
+		'process/5-counts/{counting}/{lib_name}.tsv'
 	output:
-		'out/counts/{counting}/{amplicon}/bylib/{amplicon}-{lib_name}-all.tsv'
+		'out/counts/{counting}/{lib_name}/{amplicon}/{lib_name}-{amplicon}-all.tsv'
 	run:
 		entries_lib = pd.read_csv(input[0], '\t')
 		entries = entries_lib[entries_lib.amp == wildcards.amplicon].drop(columns=['amp'])
 		table = entries.pivot('bc_l', 'bc_r', 'count')
 		table.to_csv(output[0], '\t')
 
-rule amplicon_counts_all:
+rule lib_counts_all:
 	input:
-		expand('out/counts/{{counting}}/{{amplicon}}/bylib/{{amplicon}}-{lib_name}-all.tsv', lib_name=lib_names)
+		lambda wildcards: expand(
+			'out/counts/{counting}/{lib_name}/{amplicon}/{lib_name}-{amplicon}-all.tsv',
+			counting=wildcards.counting,
+			lib_name=wildcards.lib_name,
+			amplicon=amplicons[wildcards.lib_name],
+		)
 	output:
-		'out/counts/{counting}/{amplicon}/{amplicon}-all.tsv'
+		'out/counts/{counting}/{lib_name}/{lib_name}-all.tsv'
+	run:
+		table = reduce(add, [pd.read_csv(f, '\t', index_col='bc_l') for f in input])
+		table.to_csv(output[0], '\t')
+
+# TODO: maybe merge with above somehow?
+rule counts_all:
+	input:
+		expand('out/counts/{{counting}}/{lib_name}/{lib_name}-all.tsv', lib_name=lib_names)
+	output:
+		'out/counts/{counting}/{counting}-all.tsv'
 	run:
 		table = reduce(add, [pd.read_csv(f, '\t', index_col='bc_l') for f in input])
 		table.to_csv(output[0], '\t')
 
 rule amplicon_counts:
 	input:
-		'out/counts/{counting}/{amplicon}/{matrix}-all.tsv'
+		'out/counts/{counting}/{matrix}-all.tsv'
 	output:
-		'out/counts/{counting}/{amplicon}/{matrix}.tsv'
+		'out/counts/{counting}/{matrix}.tsv'
 	run:
 		table_all = pd.read_csv(input[0], '\t', index_col='bc_l')
 		if table_all.shape == (0, 0):  # here, the empty index can’t use str methods
@@ -271,9 +303,9 @@ rule amplicon_counts:
 
 rule plot_counts:
 	input:
-		'out/counts/{counting}/{amplicon}/{matrix}{which}.tsv'
+		'out/counts/{counting}/{matrix}{which}.tsv'
 	output:
-		'out/counts/{counting}/{amplicon}/{matrix}{which}-log.png'
+		'out/counts/{counting}/{matrix}{which}-log.png'
 	run:
 		counts_long = pd.read_csv(input[0], '\t')
 		counts_na = counts_long.melt(['bc_l'], var_name='bc_r', value_name='Count')
@@ -292,11 +324,17 @@ def amp_tables_to_counts(tables: Dict[str, pd.DataFrame]):
 	counts_na = table.melt(['Amplicon', 'bc_l'], var_name='bc_r', value_name='Count')
 	return counts_na[~counts_na.Count.isna()].copy()
 
-rule plot_counts_all:
+rule plot_counts_lib:
 	input:
-		expand('out/counts/{{counting}}/{amplicon}/{amplicon}.tsv', amplicon=amplicons)
+		lambda wildcards: expand(
+			'out/counts/{counting}/{lib_name}/{amplicon}/{lib_name}-{amplicon}{which}.tsv',
+			counting=wildcards.counting,
+			lib_name=wildcards.lib_name,
+			amplicon=amplicons[wildcards.lib_name],
+			which=wildcards.which,
+		)
 	output:
-		'out/counts/{counting}/{counting}.png'
+		'out/counts/{counting}/{lib_name}/{lib_name}{which}-log.png'
 	run:
 		tables = {Path(i).parent.name: pd.read_csv(i, '\t') for i in input}
 		counts = amp_tables_to_counts(tables)
@@ -305,14 +343,6 @@ rule plot_counts_all:
 			facet_wrap('~Amplicon', ncol=4) + \
 			theme(axis_text_x=element_text(size=1.8), axis_text_y=element_text(size=1.8))
 		gg.save(output[0], dpi=300, verbose=False)
-
-rule count_symlink:
-	input:
-		'out/counts/{counting}/{amplicon}/bylib/{amplicon}-{lib_name}{which}-log.png'
-	output:
-		'out/counts/{counting}/bylib/{lib_name}/{amplicon}{which}-log.png'
-	shell:
-		'ln -sf ../../../../../{input:q} {output:q}'
 
 re_summary = re.compile(r'''HISAT2 summary stats:
 	Total reads: (?P<total>\d+)
@@ -323,15 +353,19 @@ re_summary = re.compile(r'''HISAT2 summary stats:
 
 rule spreadsheet:
 	input:
-		summaries = expand('process/4-mapped/{lib_name}_R{read}_001_summary.txt', lib_name=lib_names, read=[1,2]),
-		counts = expand('out/counts/{{counting}}/{amplicon}/bylib/{amplicon}-{lib_name}.tsv', amplicon=amplicons, lib_name=lib_names),
+		summaries = expand('process/4-mapped/{lib_name}_R{read}_summary.txt', lib_name=lib_names, read=[1,2]),
+		counts = [
+			path
+			for lib_name in lib_names
+			for path in expand('out/counts/{{counting}}/{lib_name}/{amplicon}/{lib_name}-{amplicon}.tsv', amplicon=amplicons[lib_name], lib_name=lib_name)
+		],
 	output:
 		'out/counts/{counting}/{counting}.xlsx'
 	run:
 		import openpyxl
 		from openpyxl.utils.dataframe import dataframe_to_rows
 		
-		re_name = re.compile(format('{re_amplicon}-{re_lib_name}\.tsv'))
+		re_name = re.compile(format('{re_lib_name}-{re_amplicon}\.tsv'))
 		tables_all = {
 			tuple(re_name.fullmatch(Path(i).name).groups()):
 			pd.read_csv(i, '\t') for i in input.counts

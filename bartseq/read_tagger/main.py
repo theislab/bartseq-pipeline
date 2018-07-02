@@ -4,7 +4,7 @@ from typing import Generator, Union, Iterable, Optional
 from tqdm import tqdm
 
 from . import defaults, ReadTagger, get_tagger
-from .io import write_bc_table, write_stats
+from .io import write_bc_tables, write_stats
 from ..io import transparent_open, iter_fq, read_fasta
 from ..logging import init_logging
 
@@ -42,7 +42,7 @@ def run(
 	bcs_all = list(read_fasta(bc_file))
 	
 	if bc_table:
-		write_bc_table(bc_file, bc_table)
+		write_bc_tables([bc_file], bc_table)
 	
 	# Two taggers to get two sets of statistics
 	tagger1 = get_tagger(bcs_all, len_linker, len_primer)

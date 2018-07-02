@@ -1,8 +1,27 @@
-Notes
-=====
-Problems? Ask Fatma
+BARTSeq pipeline
+================
+This is a pipeline for BARTSeq implemented with Snakemake
 
-`Cleaned Richa code <https://github.com/theislab/bartSeq>`_
+The primer design code and an older version lives in `theislab/bartSeq <https://github.com/theislab/bartSeq>`_.
+
+Entry point
+-----------
+The pipeline can be run via ``snakemake [-j 4] [-s …/bartseq/Snakefile] [-d …/mydata]``,
+where ``-j`` specifies the number of threads,
+and the other parameters default to ``./Snakefile`` and ``.``, respectively.
+
+Within the data directory, the following structure is expected:
+
+- ``in/``
+  
+  - ``reads/``
+    
+    - ``<libname>_R1_001.fastq.gz``
+    - ``<libname>_R2_001.fastq.gz``
+    - optionally additional libraries…
+  
+  - ``amplicons.fa`` or ``amplicons/<libname>.fa`` for all libraries
+  - ``barcodes.fa`` or ``barcodes/<libname>.fa`` for all libraries
 
 Read structure
 --------------

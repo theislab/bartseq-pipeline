@@ -75,6 +75,7 @@ wildcard_constraints:
 	amplicon = re_amplicon,
 	lib_name = re_lib_name,
 	matrix = re_matrix,
+	read = '[12]'
 
 
 rule all:

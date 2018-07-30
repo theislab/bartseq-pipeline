@@ -31,8 +31,8 @@ def main(data_dir: Path, library: str, out: Union[Path, str, TextIO], out_compre
 	dir_tagged = dir_process / '3-tagged'
 	dir_mapped = dir_process / '4-mapped'
 	
-	paths_fsq = [dir_tagged / f'{library}_R{r}_001.fastq.gz' for r in [1, 2]]
-	paths_map = [dir_mapped / f'{library}_R{r}_001.txt' for r in [1, 2]]
+	paths_fsq = [dir_tagged / f'{library}_R{r}.fastq.gz' for r in [1, 2]]
+	paths_map = [dir_mapped / f'{library}_R{r}.txt' for r in [1, 2]]
 	path_count = dir_process / '1-index' / f'{library}.count.txt'
 	
 	with path_count.open() as c_f:

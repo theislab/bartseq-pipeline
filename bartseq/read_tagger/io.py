@@ -19,7 +19,13 @@ def write_bc_tables(paths_bc_files: Union[Path, str], path_bc_table: Union[Path,
 			f_bc.write(tagger.get_barcode_table(plain=True))
 
 
-def write_stats(stats_file: Union[Path, str], n_reads: int, n_both_regular: Optional[int], stats1: dict, stats2: Optional[dict]=None):
+def write_stats(
+	stats_file: Union[Path, str],
+	n_reads: int,
+	n_both_regular: Optional[int],
+	stats1: dict,
+	stats2: Optional[dict] = None,
+):
 	with transparent_open(stats_file, 'wt') as f_s:
 		stats = dict(n_reads=n_reads, read1=stats1)
 		if n_both_regular is not None:

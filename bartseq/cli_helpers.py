@@ -11,12 +11,14 @@ class AbstractAttribute:
 
 
 def t_in_file(f: Union[Path, str, TextIO]) -> Union[Path, str, TextIO]:
-	if f == '-': return sys.stdin
+	if f == '-':
+		return sys.stdin
 	return f
 
 
 def t_out_file(f: Union[Path, str, TextIO]) -> Union[Path, str, TextIO]:
-	if f == '-': return sys.stdout
+	if f == '-':
+		return sys.stdout
 	return f
 
 

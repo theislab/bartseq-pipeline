@@ -16,13 +16,13 @@ openers = defaultdict(lambda: open, **openers)
 
 def transparent_open(
 	file: Union[Path, str, Iterable[bytes]],
-	mode: str='rt',
+	mode: str = 'rt',
 	*,
-	ensure_parentdir=False,
-	encoding: Optional[str]=None,
-	errors:   Optional[str]=None,
-	newline:  Optional[str]=None,
-	suffix: str=None
+	ensure_parentdir: bool = False,
+	encoding: Optional[str] = None,
+	errors: Optional[str] = None,
+	newline: Optional[str] = None,
+	suffix: str = None
 ) -> Iterable[Union[str, bytes]]:
 	"""
 	Open potentially compressed file

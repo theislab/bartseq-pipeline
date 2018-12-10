@@ -54,21 +54,48 @@ def test_tagger_ambiguous_barcodes():
 def test_tag_read_find1():
 	tagger = ReadTagger(dict(ab='A'), 1, 1)
 	
-	assert tagger.tag_read('a', 'XXabLblah', qual_9) == TaggedRead('a', qual_9, 1, 'XX', 'A', 'L', 'blah', frozenset(), False)
-	assert tagger.tag_read('b', 'abLblahXX', qual_9) == TaggedRead('b', qual_9, 1, None, 'A', 'L', 'blahXX', frozenset(), False)
-	assert tagger.tag_read('c', 'XXbvblahL', qual_9) == TaggedRead('c', qual_9, 1, None, None, None, 'XXbvblahL', frozenset(), False)
+	assert tagger.tag_read('a', 'XXabLblah', qual_9) == TaggedRead('a', qual_9, 1, 'XX', 'A', 'L', 'blah', frozenset(), False)  # noqa
+	assert tagger.tag_read('b', 'abLblahXX', qual_9) == TaggedRead('b', qual_9, 1, None, 'A', 'L', 'blahXX', frozenset(), False)  # noqa
+	assert tagger.tag_read('c', 'XXbvblahL', qual_9) == TaggedRead('c', qual_9, 1, None, None, None, 'XXbvblahL', frozenset(), False)  # noqa
 	# two occurrences
-	assert tagger.tag_read('d', 'XXabLblab', qual_9) == TaggedRead('d', qual_9, 1, 'XX', 'A', 'L', 'blab', frozenset(), False)
+	assert tagger.tag_read('d', 'XXabLblab', qual_9) == TaggedRead('d', qual_9, 1, 'XX', 'A', 'L', 'blab', frozenset(), False)  # noqa
+	
+	assert tagger.stats == dict(
+		n_only_primer=0,
+		n_multiple_bcs=0,
+		n_no_barcode=1,
+		n_barcode_mismatch=0,
+		n_junk=2,
+		n_regular=3,
+	)
 
 
 def test_tag_read_find_mismatch():
 	tagger = ReadTagger(dict(ab='A'), 1, 1)
 	
-	assert tagger.tag_read('a', 'XXaGLblah', qual_9) == TaggedRead('a', qual_9, 1, 'XX', 'A', 'L', 'blah', frozenset(), True)
+	assert tagger.tag_read('a', 'XXaGLblah', qual_9) == TaggedRead('a', qual_9, 1, 'XX', 'A', 'L', 'blah', frozenset(), True)  # noqa
 	# two occurrences
-	assert tagger.tag_read('b', 'XXaGLblab', qual_9) == TaggedRead('b', qual_9, 1, 'XX', 'A', 'L', 'blab', frozenset(), True)
+	assert tagger.tag_read('b', 'XXaGLblab', qual_9) == TaggedRead('b', qual_9, 1, 'XX', 'A', 'L', 'blab', frozenset(), True)  # noqa
+	
+	assert tagger.stats == dict(
+		n_only_primer=0,
+		n_multiple_bcs=0,
+		n_no_barcode=0,
+		n_barcode_mismatch=2,
+		n_junk=2,
+		n_regular=2,
+	)
 
 
 def test_tag_read_find2():
 	tagger = ReadTagger(dict(ab='A', bL='B'), 1, 1)
-	assert tagger.tag_read('a', 'XXabLxblah', qual_9) == TaggedRead('a', qual_9, 1, 'XX', 'A', 'L', 'xblah', frozenset({'B'}), False)
+	assert tagger.tag_read('a', 'XXabLxblah', qual_9) == TaggedRead('a', qual_9, 1, 'XX', 'A', 'L', 'xblah', frozenset({'B'}), False)  # noqa
+	
+	assert tagger.stats == dict(
+		n_only_primer=0,
+		n_multiple_bcs=1,
+		n_no_barcode=0,
+		n_barcode_mismatch=0,
+		n_junk=1,
+		n_regular=1,
+	)

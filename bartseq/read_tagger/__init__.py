@@ -76,6 +76,16 @@ class TaggedRead(NamedTuple):
 '''
 
 
+PREDS = dict(
+	n_only_primer=lambda read: read.is_just_primer,
+	n_multiple_bcs=lambda read: read.has_multiple_barcodes,
+	n_no_barcode=lambda read: not read.barcode,
+	n_barcode_mismatch=lambda read: read.barcode_mismatch,
+	n_junk=lambda read: read.junk,
+	n_regular=lambda read: read.is_regular,
+)
+
+
 def get_mismatches(barcode: str, *, max_mm: int = 1) -> Generator[str, None, None]:
 	yield barcode
 	if max_mm != 1:
@@ -115,7 +125,8 @@ def get_all_barcodes(
 
 
 class ReadTagger:
-	def __init__(self,
+	def __init__(
+		self,
 		bc_to_id: Dict[str, str],
 		len_linker: int,
 		len_primer: int,
@@ -150,7 +161,7 @@ class ReadTagger:
 		# as ordered set
 		matches = OrderedDict((match, None) for match in self.search_barcode(seq_read))
 		
-		match_iter:Iterator[Tuple[int, int, str]] = iter(matches) 
+		match_iter: Iterator[Tuple[int, int, str]] = iter(matches)
 		bc_start, bc_end, barcode = next(match_iter, (None, None, None))
 		
 		bc_id = self.bc_to_id.get(barcode)
@@ -175,12 +186,9 @@ class ReadTagger:
 		)
 		
 		if self.stats is not None:
-			if read.is_just_primer:        self.stats['n_only_primer'] += 1
-			if read.has_multiple_barcodes: self.stats['n_multiple_bcs'] += 1
-			if not read.barcode:           self.stats['n_no_barcode'] += 1
-			if read.barcode_mismatch:      self.stats['n_barcode_mismatch'] += 1
-			if read.junk:                  self.stats['n_junk'] += 1
-			if read.is_regular:            self.stats['n_regular'] += 1
+			for name, pred in PREDS.items():
+				if pred(read):
+					self.stats[name] += 1
 		
 		return read
 	

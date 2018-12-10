@@ -29,7 +29,8 @@ def run(
 	has_two_reads = bool(in_2)
 	
 	if dry_run:
-		if bc_table: print('Would write bc table to', bc_file)
+		if bc_table:
+			print('Would write bc table to', bc_file)
 		print('Would write', 'two read files:' if has_two_reads else 'one read file:')
 		print('\tWould read from', in_1, f'and {in_2}' if has_two_reads else '')
 		print('\tWould write to', out_1, f'and {out_2}' if has_two_reads else '')
@@ -49,10 +50,12 @@ def run(
 	tagger2 = get_tagger(bcs_all, len_linker, len_primer) if has_two_reads else None
 	
 	with tqdm(total=total) if total != 0 else ctx_dummy() as pb, \
-			transparent_open(in_1, 'rt', suffix=in_compression)  as f_in_1, \
+			transparent_open(in_1, 'rt', suffix=in_compression) as f_in_1, \
 			transparent_open(out_1, 'wt', suffix=out_compression, ensure_parentdir=True) as f_out_1, \
-			transparent_open(in_2, 'rt', suffix=in_compression) if has_two_reads else ctx_dummy() as f_in_2, \
-			transparent_open(out_2, 'wt', suffix=out_compression, ensure_parentdir=True) if has_two_reads else ctx_dummy() as f_out_2:
+			transparent_open(in_2, 'rt', suffix=in_compression) \
+				if has_two_reads else ctx_dummy() as f_in_2, \
+			transparent_open(out_2, 'wt', suffix=out_compression, ensure_parentdir=True) \
+				if has_two_reads else ctx_dummy() as f_out_2:
 		
 		n_reads = 0
 		n_both_regular = 0
@@ -84,7 +87,8 @@ def run(
 				update_pb(pb, tagger1, r)
 				n_reads = r
 		
-		if pb: pb.close()
+		if pb:
+			pb.close()
 	
 	write_stats(
 		stats_file, n_reads, n_both_regular if has_two_reads else None,
@@ -93,7 +97,8 @@ def run(
 
 
 def update_pb(pb: Optional[tqdm], tgr: ReadTagger, i: int):
-	if not pb: return
+	if not pb:
+		return
 	pb.update(1)
 	if i % 10000 == 0:
 		pb.set_description(', '.join(f'{k}: {v}' for k, v in tgr.stats.items()), refresh=False)

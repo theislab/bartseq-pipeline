@@ -317,8 +317,10 @@ rule plot_counts:
 			Path(output[0]).write_bytes(EMPTY_PNG)
 			return
 		
-		gg = plot_counts(counts) + \
-			theme(axis_text_x=element_text(size=4), axis_text_y=element_text(size=4))
+		gg = (
+			plot_counts(counts)
+			+ theme(axis_text_x=element_text(size=4), axis_text_y=element_text(size=4))
+		)
 		gg.save(output[0], dpi=300, verbose=False)
 
 def amp_tables_to_counts(tables: Dict[str, pd.DataFrame]):
@@ -341,9 +343,15 @@ rule plot_counts_lib:
 		tables = {Path(i).parent.name: pd.read_csv(i, '\t') for i in input}
 		counts = amp_tables_to_counts(tables)
 		
-		gg = plot_counts(counts) + \
-			facet_wrap('~Amplicon', ncol=4) + \
-			theme(axis_text_x=element_text(size=1.8), axis_text_y=element_text(size=1.8))
+		if counts.shape[0] <= 2:
+			Path(output[0]).write_bytes(EMPTY_PNG)
+			return
+		
+		gg = (
+			plot_counts(counts)
+			+ facet_wrap('~Amplicon', ncol=4)
+			+ theme(axis_text_x=element_text(size=1.8), axis_text_y=element_text(size=1.8))
+		)
 		gg.save(output[0], dpi=300, verbose=False)
 
 re_summary = re.compile(r'''HISAT2 summary stats:

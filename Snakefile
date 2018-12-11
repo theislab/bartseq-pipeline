@@ -1,4 +1,5 @@
 # usage example: snakemake -d data/ngs15 -j 4
+import sys
 import re
 import json
 from collections import Counter
@@ -41,6 +42,14 @@ amplicons = {
 	lib: [line.lstrip('>') for line in path.read_text().splitlines() if line.startswith('>')] + ['-unmapped', '-one-mapped', '-mismatch']
 	for lib, path in get_input_seq_paths('amplicons')
 }
+
+amps_with_spaces = [(libname, name) for libname, lib in amplicons.items() for name in lib if ' ' in name]
+if amps_with_spaces:
+	print(
+		'Found spaces in amplicon headers. HISAT2 sadly can’t deal with this\n'
+		'Please get rid of the spaces in amplicons {}'.format(amps_with_spaces),
+		file=sys.stderr)
+	sys.exit(1)
 
 len_barcode = max(
 	len(line)

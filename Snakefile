@@ -19,6 +19,13 @@ from bartseq.read_tagger.io import write_bc_tables
 from bartseq.read_tagger.defaults import len_linker
 from bartseq.heatmaps import plot_counts
 
+# Type hints for PyCharm
+from snakemake.io import expand, InputFiles, OutputFiles, Wildcards
+input: InputFiles
+output: OutputFiles
+wildcards: Wildcards
+
+
 min_version('4.5.1')
 
 EMPTY_PNG = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x04\x00\x00\x00\xb5\x1c\x0c\x02\x00\x00\x00\x0bIDATx\xdacd`\x00\x00\x00\x06\x00\x020\x81\xd0/\x00\x00\x00\x00IEND\xaeB`\x82'
@@ -76,7 +83,6 @@ wildcard_constraints:
 	lib_name = re_lib_name,
 	matrix = re_matrix,
 	read = '[12]'
-
 
 rule all:
 	input:
@@ -303,7 +309,7 @@ rule amplicon_counts:
 			table = table_all.loc[table_all.index.str.match('L.*'), table_all.columns.str.match('R.*')]
 		table.to_csv(output[0], '\t')
 
-rule plot_counts:
+rule plot_counts_:
 	input:
 		'out/counts/{counting}/{lib_name}/{amplicon}/{lib_name}-{amplicon}{which}.tsv'
 	output:

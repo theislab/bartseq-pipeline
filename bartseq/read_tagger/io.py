@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union, Optional, Iterable
 
 from bartseq.read_tagger import HTML_INTRO
 from ..io import read_fasta, transparent_open
 
 
-def write_bc_tables(paths_bc_files: Union[Path, str], path_bc_table: Union[Path, str]):
+def write_bc_tables(paths_bc_files: Iterable[Union[Path, str]], path_bc_table: Union[Path, str]):
 	"""This is mainly independent of the rest, so do simple duplicate work to be able to create this separately"""
 	from . import get_tagger
 	Path(path_bc_table).parent.mkdir(parents=True, exist_ok=True)

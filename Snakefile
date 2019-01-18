@@ -22,6 +22,7 @@ from bartseq.heatmaps import plot_counts
 
 # Type hints for PyCharm
 from snakemake.io import expand, InputFiles, OutputFiles, Wildcards
+config: dict
 input: InputFiles
 output: OutputFiles
 wildcards: Wildcards
@@ -84,6 +85,10 @@ re_amplicon = '({})'.format('|'.join(re.escape(a) for a in set(a for amps in amp
 re_lib_name = '({})'.format('|'.join(re.escape(ln) for ln in lib_names))
 re_matrix = '(both|one|{re_lib_name}/({re_lib_name}|{re_amplicon}/{re_lib_name}-{re_amplicon}))'.format(re_amplicon=re_amplicon, re_lib_name=re_lib_name)
 
+configfile: 'config.yml'
+CFG_AMP_MIN = 'amplicon-min-length'
+if isinstance(config.setdefault(CFG_AMP_MIN, None), str):
+	config[CFG_AMP_MIN] = int(config[CFG_AMP_MIN])
 
 wildcard_constraints:
 	which = '(-all|)',
@@ -207,7 +212,7 @@ rule map_reads:
 		amplicons = amplicon_index_files,
 		read = 'process/3-tagged/{lib_name}_R{read}.fastq.gz',
 	output:
-		map = 'process/4-mapped/{lib_name}_R{read}.txt',
+		map = 'process/4-mapped/{lib_name}_R{read}.tsv',
 		summary = 'process/4-mapped/{lib_name}_R{read}_summary.txt'
 	threads: 4
 	shell:
@@ -221,13 +226,13 @@ rule map_reads:
 			--new-summary --summary-file {output.summary:q} \
 			-q -U {input.read:q} | \
 			grep -v "^@" - | \
-			cut -f3 > {output.map:q}
+			cut -f3,10 --output-delimiter='\t' > {output.map:q}
 		'''
 
 rule count:
 	input:
 		reads = expand('process/3-tagged/{{lib_name}}_R{read}.fastq.gz', read=[1,2]),
-		mappings = expand('process/4-mapped/{{lib_name}}_R{read}.txt', read=[1,2]),
+		mappings = expand('process/4-mapped/{{lib_name}}_R{read}.tsv', read=[1,2]),
 		stats_file = 'process/3-tagged/{lib_name}_stats.json'
 	output:
 		expand('process/5-counts/{counting}/{{lib_name}}.tsv', counting=['both', 'one'])
@@ -248,10 +253,13 @@ rule count:
 			
 			bcs1 = get_barcodes(r1)
 			bcs2 = get_barcodes(r2)
-			amps1 = (a.strip() for a in a1)
-			amps2 = (a.strip() for a in a2)
-			for bc1, bc2, amp1, amp2 in tqdm(zip(bcs1, bcs2, amps1, amps2), total=total):
+			amps1 = (a.strip().split('\t') for a in a1)
+			amps2 = (a.strip().split('\t') for a in a2)
+			for bc1, bc2, (amp1, amp1s), (amp2, amp2s) in tqdm(zip(bcs1, bcs2, amps1, amps2), total=total):
 				bc1, bc2 = sorted([bc1, bc2])
+				if config[CFG_AMP_MIN] is not None:
+					if len(amp1s) < config[CFG_AMP_MIN]: amp1 = '*'
+					if len(amp2s) < config[CFG_AMP_MIN]: amp2 = '*'
 				if amp1 == amp2:
 					if amp1 == '*':
 						counts[bc1, bc2, '-unmapped'] += 1

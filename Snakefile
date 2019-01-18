@@ -1,4 +1,5 @@
 # usage example: snakemake -d data/ngs15 -j 4
+import sys
 import re
 import json
 from collections import Counter
@@ -48,6 +49,14 @@ amplicons = {
 	lib: [line.lstrip('>') for line in path.read_text().splitlines() if line.startswith('>')] + ['-unmapped', '-one-mapped', '-mismatch']
 	for lib, path in get_input_seq_paths('amplicons')
 }
+
+amps_with_spaces = [(libname, name) for libname, lib in amplicons.items() for name in lib if ' ' in name]
+if amps_with_spaces:
+	print(
+		'Found spaces in amplicon headers. HISAT2 sadly can’t deal with this\n'
+		'Please get rid of the spaces in amplicons {}'.format(amps_with_spaces),
+		file=sys.stderr)
+	sys.exit(1)
 
 len_barcode = max(
 	len(line)
@@ -323,8 +332,10 @@ rule plot_counts_:
 			Path(output[0]).write_bytes(EMPTY_PNG)
 			return
 		
-		gg = plot_counts(counts) + \
-			theme(axis_text_x=element_text(size=4), axis_text_y=element_text(size=4))
+		gg = (
+			plot_counts(counts)
+			+ theme(axis_text_x=element_text(size=4), axis_text_y=element_text(size=4))
+		)
 		gg.save(output[0], dpi=300, verbose=False)
 
 def amp_tables_to_counts(tables: Dict[str, pd.DataFrame]):
@@ -347,9 +358,15 @@ rule plot_counts_lib:
 		tables = {Path(i).parent.name: pd.read_csv(i, '\t') for i in input}
 		counts = amp_tables_to_counts(tables)
 		
-		gg = plot_counts(counts) + \
-			facet_wrap('~Amplicon', ncol=4) + \
-			theme(axis_text_x=element_text(size=1.8), axis_text_y=element_text(size=1.8))
+		if counts.shape[0] <= 2:
+			Path(output[0]).write_bytes(EMPTY_PNG)
+			return
+		
+		gg = (
+			plot_counts(counts)
+			+ facet_wrap('~Amplicon', ncol=4)
+			+ theme(axis_text_x=element_text(size=1.8), axis_text_y=element_text(size=1.8))
+		)
 		gg.save(output[0], dpi=300, verbose=False)
 
 re_summary = re.compile(r'''HISAT2 summary stats:

@@ -28,6 +28,14 @@ output: OutputFiles
 wildcards: Wildcards
 
 
+try:
+	from better_exchook import better_exchook
+except ImportError:
+	pass
+else:
+	sys.excepthook = better_exchook
+
+
 min_version('4.5.1')
 
 EMPTY_PNG = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x04\x00\x00\x00\xb5\x1c\x0c\x02\x00\x00\x00\x0bIDATx\xdacd`\x00\x00\x00\x06\x00\x020\x81\xd0/\x00\x00\x00\x00IEND\xaeB`\x82'

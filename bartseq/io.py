@@ -64,8 +64,11 @@ def parse_fq(line_header: str, line_seq: str, line_plus: str, line_qual: str) ->
 
 def iter_fq(lines: Iterable[str]) -> Generator[Tuple[str, str, str], None, None]:
 	line_it = iter(lines)
-	while True:
-		yield parse_fq(next(line_it), next(line_it), next(line_it), next(line_it))
+	for header in line_it:
+		try:
+			yield parse_fq(header, next(line_it), next(line_it), next(line_it))
+		except StopIteration:
+			raise IOError(f'Fastq file doesn’t contain new line after header {header}')
 
 
 def read_fasta(filename: Union[Path, str]) -> Generator[Tuple[str, str], None, None]:

@@ -32,7 +32,7 @@ def main(data_dir: Path, library: str, out: Union[Path, str, TextIO], out_compre
 	dir_mapped = dir_process / '4-mapped'
 	
 	paths_fsq = [dir_tagged / f'{library}_R{r}.fastq.gz' for r in [1, 2]]
-	paths_map = [dir_mapped / f'{library}_R{r}.txt' for r in [1, 2]]
+	paths_map = [dir_mapped / f'{library}_R{r}.tsv' for r in [1, 2]]
 	path_count = dir_process / '1-index' / f'{library}.count.txt'
 	
 	with path_count.open() as c_f:
@@ -47,23 +47,24 @@ def main(data_dir: Path, library: str, out: Union[Path, str, TextIO], out_compre
 		print(
 			'read',
 			'header', 'read_seq', 'quality_seq',
-			'amplicon',
+			'amplicon', 'match_len',
 			'barcode', 'linker', 'has_multiple_bcs',
 			'is_just_primer', 'other_bcs', 'has_bc_mismatch', 'junk',
 			sep='\t', file=f_out,
 		)
 		
-		for read_side, ((header, read, qual), amp) in tqdm(interleave(
+		for read_side, ((header, read, qual), mapping) in tqdm(interleave(
 			zip(iter_fq(fsq_r1), map_r1),
 			zip(iter_fq(fsq_r2), map_r2),
 		), total=2 * n_pairs):
 			fields = list(RE_FIELDS.finditer(header))
+			amp, match = mapping.strip().split('\t')
 			
 			print(
 				read_side + 1,
 				header[:fields[0].start() - 1],
 				read, qual,
-				amp.strip(),
+				amp, len(match),
 				*[v if v != 'None' else '' for v in (m.group('value') for m in fields)],
 				sep='\t', file=f_out,
 			)

@@ -15,8 +15,14 @@ def bc_range(bc_series: pd.Series):
 	prefixes = set(bc[0] for bc in bc_series)
 	r = []
 	for prefix in sorted(prefixes):
-		bc_ns = set(int(bc[1:]) for bc in bc_series[bc_series.str.startswith(prefix)])
-		r = r + [f'{prefix}{i:02}' for i in range(min(bc_ns), max(bc_ns) + 1)]
+		bc_ns = set(bc[1:] for bc in bc_series[bc_series.str.startswith(prefix)])
+		try:
+			bc_ns = {int(bc) for bc in bc_ns}
+		except ValueError:  # Can’t convert to int
+			r = r + [f'{prefix}{i}' for i in sorted(bc_ns)]
+		else:
+			r = r + [f'{prefix}{i:02}' for i in range(min(bc_ns), max(bc_ns) + 1)]
+	
 	return r
 
 

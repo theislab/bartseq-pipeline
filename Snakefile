@@ -178,6 +178,7 @@ rule tag_reads:
 		expand('process/2-trimmed/{{lib_name}}_R{read}.fastq.gz', read=[1,2]),
 		count_file = 'process/1-index/{lib_name}.count.txt',
 		bc_file = 'process/1-index/barcodes/{lib_name}.fa',
+		linker_file = 'in/linkers.fa' if Path('in/linkers.fa').is_file() else []
 	output:
 		expand('process/3-tagged/{{lib_name}}_R{read}.fastq.gz', read=[1,2]),
 		stats_file='process/3-tagged/{lib_name}_stats.json',
@@ -188,6 +189,9 @@ rule tag_reads:
 			in_1=input[0], out_1=output[0],
 			in_2=input[1], out_2=output[1],
 			bc_file=input.bc_file,
+			# it’s a bit weird: if it’s a list, `input` doesn’t have the attribute
+			# In case that changes, I defensively make sure that a string or None is passed.
+			linker_file=getattr(input, 'linker_file', []) or None,
 			stats_file=output.stats_file,
 			total=total,
 		)

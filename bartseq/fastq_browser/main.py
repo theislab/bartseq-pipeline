@@ -12,7 +12,7 @@ fields = [
 	'barcode', 'linker', 'multi-bc', 'just-primer',
 	'other-bcs', 'barcode-mismatch', 'junk',
 ]
-RE_FIELDS = re.compile(f'(?P<field>{"|".join(fields)})=(?P<value>[^ ]+)')
+RE_FIELDS = re.compile(f'(?P<field>{"|".join(fields)})=(?P<value>[^ ]*)')
 
 
 def interleave(*iterables):

@@ -44,8 +44,8 @@ def run(
 	bcs_all = list(read_fasta(bc_file))
 	if linker_file:  # If a linker file is passed, we match the full thing
 		linkers = dict(read_fasta(linker_file))
-		bcs_l = [(h, linkers['Left' ]+bc) for h, bc in bcs_all if h[0] == 'L']
-		bcs_r = [(h, linkers['Right']+bc) for h, bc in bcs_all if h[0] == 'R']
+		bcs_l = [(h, bc+linkers['Left' ]) for h, bc in bcs_all if h[0] == 'L']
+		bcs_r = [(h, bc+linkers['Right']) for h, bc in bcs_all if h[0] == 'R']
 		bcs_all = bcs_l + bcs_r
 		len_linker = 0
 	

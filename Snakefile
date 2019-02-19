@@ -2,7 +2,6 @@
 import sys
 import re
 import json
-from collections import Counter
 from functools import reduce
 from operator import add
 from pathlib import Path
@@ -10,12 +9,11 @@ from typing import Dict
 
 from snakemake.utils import min_version, listfiles, format
 import pandas as pd
-from tqdm import tqdm
 import matplotlib
 matplotlib.rcParams['backend'] = 'agg'  # make pypy work without Qt
 from plotnine import facet_wrap, theme, element_text
 
-from bartseq.io import transparent_open
+from bartseq.counter.main import main as run_counter
 from bartseq.read_tagger.io import write_bc_tables
 from bartseq.read_tagger.defaults import len_linker
 from bartseq.heatmaps import plot_counts
@@ -249,46 +247,8 @@ rule count:
 	output:
 		expand('process/5-counts/{counting}/{{lib_name}}.tsv', counting=['both', 'one'])
 	run:
-		bc_re = re.compile(r'barcode=(\w+)')
 		total = json.loads(Path(input.stats_file).read_bytes())['n_both_regular']
-		def get_barcodes(fastq_file):
-			for header in fastq_file:
-				next(fastq_file)
-				next(fastq_file)
-				next(fastq_file)
-				yield bc_re.search(header).group(1)
-		counts = Counter()
-		counts_one = Counter()
-		with \
-			transparent_open(input.reads[0]) as r1, open(input.mappings[0]) as a1, \
-			transparent_open(input.reads[1]) as r2, open(input.mappings[1]) as a2:
-			
-			bcs1 = get_barcodes(r1)
-			bcs2 = get_barcodes(r2)
-			amps1 = (a.strip().split('\t') for a in a1)
-			amps2 = (a.strip().split('\t') for a in a2)
-			for bc1, bc2, (amp1, amp1s), (amp2, amp2s) in tqdm(zip(bcs1, bcs2, amps1, amps2), total=total):
-				bc1, bc2 = sorted([bc1, bc2])
-				if config[CFG_AMP_MIN] is not None:
-					if len(amp1s) < config[CFG_AMP_MIN]: amp1 = '*'
-					if len(amp2s) < config[CFG_AMP_MIN]: amp2 = '*'
-				if amp1 == amp2:
-					if amp1 == '*':
-						counts[bc1, bc2, '-unmapped'] += 1
-					else:
-						counts[bc1, bc2, amp1] += 1
-						counts_one[bc1, bc2, amp1] += 1
-				elif amp1 == '*':
-					counts[bc1, bc2, '-one-mapped'] += 1
-					counts_one[bc1, bc2, amp2] += 1  # amp1 == '*'
-				else:
-					counts[bc1, bc2, '-mismatch'] += 1
-			
-			for path, counter in zip(output, [counts, counts_one]):
-				with open(path, 'w') as of:
-					print('bc_l', 'bc_r', 'amp', 'count', sep='\t', file=of)
-					for fields, c in counter.items():
-						print(*fields, c, sep='\t', file=of)
+		run_counter(Path('.'), wildcards.lib_name, total=total, amp_min=config[CFG_AMP_MIN])
 
 rule amplicon_counts_all:
 	input:

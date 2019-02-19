@@ -1,3 +1,4 @@
+import json
 import re
 import collections
 from pathlib import Path
@@ -31,6 +32,12 @@ def count(
 ) -> Tuple[Counter[Tuple[str, str, str]], Counter[Tuple[str, str, str]]]:
 	reads = [f'{data_dir}/process/3-tagged/{library}_R{read}.fastq.gz' for read in [1, 2]]
 	mappings = [f'{data_dir}/process/4-mapped/{library}_R{read}.tsv' for read in [1, 2]]
+	
+	if total is None:
+		try:
+			total = json.loads(Path(f'{data_dir}/process/3-tagged/{library}_stats.json').read_bytes())['n_both_regular']
+		except Exception:
+			pass
 	
 	counts_both = collections.Counter()
 	counts_one = collections.Counter()

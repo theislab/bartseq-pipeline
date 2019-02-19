@@ -247,8 +247,7 @@ rule count:
 	output:
 		expand('process/5-counts/{counting}/{{lib_name}}.tsv', counting=['both', 'one'])
 	run:
-		total = json.loads(Path(input.stats_file).read_bytes())['n_both_regular']
-		run_counter(Path('.'), wildcards.lib_name, total=total, amp_min=config[CFG_AMP_MIN])
+		run_counter(Path('.'), wildcards.lib_name, amp_min=config[CFG_AMP_MIN])
 
 rule amplicon_counts_all:
 	input:

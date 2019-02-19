@@ -26,7 +26,7 @@ class FastqBrowserCLI(CLI):
 	
 	@staticmethod
 	def check_args(parser: ArgumentParser, args: Namespace):
-		args.library = suggest_library(args.data_dir, parser.error)
+		args.library = suggest_library(args.data_dir, args.library, parser.error)
 	
 	@staticmethod
 	@clean_kbdinterrupt

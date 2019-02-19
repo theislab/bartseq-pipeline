@@ -3,7 +3,7 @@ import sys
 from argparse import ArgumentParser, Namespace, _SubParsersAction
 from functools import wraps
 from pathlib import Path
-from typing import Sequence, Dict, Union, TextIO, Callable
+from typing import Sequence, Dict, Union, TextIO, Callable, Optional
 
 
 class AbstractAttribute:
@@ -93,12 +93,14 @@ def clean_kbdinterrupt(callback):
 RE_READ_FILE = re.compile(r'(?P<lib>.+)_R(?P<read>[12])_001\.fastq\.gz')
 
 
-def suggest_library(data_dir: Path, raise_error: Callable[[str], None]) -> str:
+def suggest_library(data_dir: Path, library: Optional[str], raise_error: Callable[[str], None]) -> str:
 	libraries = sorted({
 		RE_READ_FILE.fullmatch(p.name)['lib']
 		for p in (data_dir / 'in' / 'reads').glob('*_R[12]_001.fastq.gz')
 	})
-	if len(libraries) == 1:
+	if library in libraries:
+		return library
+	elif len(libraries) == 1:
 		return libraries[0]
 	else:
 		raise_error(f'You have to specify a library from: {", ".join(libraries)}')

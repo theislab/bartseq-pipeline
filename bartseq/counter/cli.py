@@ -35,7 +35,7 @@ class CounterCLI(CLI):
 		if args.one:
 			args.both = not args.one
 		del args.one
-		args.library = suggest_library(args.data_dir, parser.error)
+		args.library = suggest_library(args.data_dir, args.library, parser.error)
 	
 	@staticmethod
 	@clean_kbdinterrupt

@@ -1,13 +1,12 @@
 import sys
-from collections import Counter
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Counter, Tuple
 from typing.io import TextIO
 
 from . import count
 
 
-def print_counter(counter: Counter, of: Optional[TextIO] = None):
+def print_counter(counter: Counter[Tuple[str, str, str]], of: Optional[TextIO] = None):
 	if of is None:
 		of = sys.stdout
 	print('bc_l', 'bc_r', 'amp', 'count', sep='\t', file=of)
@@ -19,11 +18,12 @@ def main(
 	data_dir: Path,
 	library: str,
 	*,
+	allow_mismatch: bool = True,
 	both: Optional[bool] = None,
 	total: Optional[int] = None,
 	amp_min: Optional[int] = None,
 ):
-	counts_both, counts_one = count(data_dir, library, total=total, amp_min=amp_min)
+	counts_both, counts_one = count(data_dir, library, allow_mismatch=allow_mismatch, total=total, amp_min=amp_min)
 	
 	if both is None:
 		for counter, counting in [(counts_both, 'both'), (counts_one, 'one')]:

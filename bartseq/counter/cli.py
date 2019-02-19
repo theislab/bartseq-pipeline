@@ -16,6 +16,9 @@ class CounterCLI(CLI):
 				'Library name. E.g. “Lib1_S1_L001” for input files named “Lib1_S1_L001_R{12}_001.fastq.gz”. '
 				'Omittable if only one library exists.'))
 		parser.add_argument(
+			'--no-mismatch', dest='allow_mismatch', default=True, action='store_false',
+			help='Ignore barcodes with mismatches while counting.')
+		parser.add_argument(
 			'--both', default=None, action='store_true',
 			help='Print the count results for both to stdout. Default: Write to “./process/5-counts” instead')
 		parser.add_argument(

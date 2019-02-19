@@ -94,11 +94,11 @@ RE_READ_FILE = re.compile(r'(?P<lib>.+)_R(?P<read>[12])_001\.fastq\.gz')
 
 
 def suggest_library(data_dir: Path, raise_error: Callable[[str], None]) -> str:
-	libraries = {
+	libraries = sorted({
 		RE_READ_FILE.fullmatch(p.name)['lib']
 		for p in (data_dir / 'in' / 'reads').glob('*_R[12]_001.fastq.gz')
-	}
+	})
 	if len(libraries) == 1:
-		return next(iter(libraries))
+		return libraries[0]
 	else:
 		raise_error(f'You have to specify a library from: {", ".join(libraries)}')

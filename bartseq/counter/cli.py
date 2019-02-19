@@ -2,11 +2,10 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 from .main import main
-from ..io import openers
-from ..cli_helpers import CLI, t_out_file, clean_kbdinterrupt, suggest_library
+from ..cli_helpers import CLI, clean_kbdinterrupt, suggest_library
 
 
-class FastqBrowserCLI(CLI):
+class CounterCLI(CLI):
 	@staticmethod
 	def populate_parser(parser: ArgumentParser) -> ArgumentParser:
 		parser.add_argument(
@@ -17,15 +16,22 @@ class FastqBrowserCLI(CLI):
 				'Library name. E.g. “Lib1_S1_L001” for input files named “Lib1_S1_L001_R{12}_001.fastq.gz”. '
 				'Omittable if only one library exists.'))
 		parser.add_argument(
-			'out', nargs='?', default='-', type=t_out_file,
-			help='FASTA file to write to. Supported compression: see --out-compression')
+			'--both', default=None, action='store_true',
+			help='Print the count results for both to stdout. Default: Write to “./process/5-counts” instead')
 		parser.add_argument(
-			'--out-compression', '-o', choices=openers.keys(),
-			help='Specify compression if writing to stdout or a file with unusual suffix')
+			'--one', default=None, action='store_true',
+			help='Print the count results for one to stdout. Default: Write to “./process/5-counts” instead')
 		return parser
 	
 	@staticmethod
 	def check_args(parser: ArgumentParser, args: Namespace):
+		if (
+			(args.both and args.one is not None) or
+			(args.one and args.both is not None)
+		): parser.error('Cannot specify --both and --one')
+		if args.one:
+			args.both = not args.one
+		del args.one
 		args.library = suggest_library(args.data_dir, parser.error)
 	
 	@staticmethod
@@ -36,4 +42,4 @@ class FastqBrowserCLI(CLI):
 		main(**kwargs)
 
 
-cli = FastqBrowserCLI()
+cli = CounterCLI()

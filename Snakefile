@@ -93,8 +93,13 @@ re_matrix = '(both|one|{re_lib_name}/({re_lib_name}|{re_amplicon}/{re_lib_name}-
 
 configfile: 'config.yml'
 CFG_AMP_MIN = 'amplicon-min-length'
-if isinstance(config.setdefault(CFG_AMP_MIN, None), str):
-	config[CFG_AMP_MIN] = int(config[CFG_AMP_MIN])
+CFG_ALLOW_MISMATCH = 'allow-mismatch'
+for n, t, d in [
+	(CFG_AMP_MIN,        int,  None),
+	(CFG_ALLOW_MISMATCH, bool, True),
+]:
+	if isinstance(config.setdefault(n, d), str):
+		config[n] = t(config[n])
 
 wildcard_constraints:
 	which = '(-all|)',
@@ -247,7 +252,7 @@ rule count:
 	output:
 		expand('process/5-counts/{counting}/{{lib_name}}.tsv', counting=['both', 'one'])
 	run:
-		run_counter(Path('.'), wildcards.lib_name, amp_min=config[CFG_AMP_MIN])
+		run_counter(Path('.'), wildcards.lib_name, allow_mismatch=config[CFG_ALLOW_MISMATCH], amp_min=config[CFG_AMP_MIN])
 
 rule amplicon_counts_all:
 	input:

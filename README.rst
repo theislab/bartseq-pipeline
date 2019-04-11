@@ -23,6 +23,16 @@ Within the data directory, the following structure is expected:
   - ``amplicons.fa`` or ``amplicons/<libname>.fa`` for all libraries
   - ``barcodes.fa`` or ``barcodes/<libname>.fa`` for all libraries
 
+- ``config.yml`` – A file with the defaults
+
+  .. code:: yaml
+  
+     amplicon-min-length: null  # You can set an integer like 70
+     allow-mismatch:      True  # You can set this to False
+
+Through the way Snakemake works, you need to create this file.
+leave it empty to use the defaults.
+
 Output
 ------
 The pipeline creates a ``process`` and an ``out`` directory.

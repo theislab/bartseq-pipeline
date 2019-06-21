@@ -1,5 +1,5 @@
 .. image:: https://zenodo.org/badge/139153315.svg
-   :target: https://zenodo.org/badge/latestdoi/139153315
+   :target: https://doi.org/10.5281/zenodo.3251773
 
 BARTSeq pipeline
 ================

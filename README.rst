@@ -1,5 +1,9 @@
+.. image:: https://zenodo.org/badge/139153315.svg
+   :target: https://zenodo.org/badge/latestdoi/139153315
+
 BARTSeq pipeline
 ================
+
 This is a pipeline for BARTSeq implemented with Snakemake
 
 The primer design code and an older version lives in `theislab/bartSeq <https://github.com/theislab/bartSeq>`_.

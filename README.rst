@@ -1,10 +1,10 @@
 .. image:: https://zenodo.org/badge/139153315.svg
    :target: https://doi.org/10.5281/zenodo.3251773
 
-BARTSeq pipeline
-================
+BART-Seq pipeline
+=================
 
-This is a pipeline for BARTSeq implemented with Snakemake
+This is a pipeline for BART-Seq implemented with Snakemake
 
 The primer design code and an older version lives in `theislab/bartSeq <https://github.com/theislab/bartSeq>`_.
 

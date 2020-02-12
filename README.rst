@@ -47,6 +47,50 @@ The ``out`` directory contains plots and summary spreadsheets.
 but you can add a tag for the mapped amplicon by executing e.g.
 ``python -m bartseq browse NGS16 Lib1_S1_L001 | gzip >Lib1.fq.gz``
 
+Command line interface
+----------------------
+
+``python -m bartseq tag [<options>] [in_1] [out_1]``
+
+in_1
+   Read1 file to read from. Supported compression: see --in-compression
+out_1
+   Read1 file to write to. Supported compression: see --out-compression
+
+--in-2 IN_2                                    Read2 file to read from. Supported compression: see --in-compression
+--out-2 OUT_2                                  Read2 file to write to. Supported compression: see --out-compression
+--bc-file=BC_FILE, -b BC_FILE                  Barcode file in the format ``<ID> <Sequence>`` (with header)
+--stats-file=STATS_FILE, -s STATS_FILE         File to write final stats to (in JSON format)
+--bc-table=BC_TABLE, -B BC_TABLE               File name for the HTML table of barcode mismatches
+--total=TOTAL, -t TOTAL                        Number of fastq records in file. “0” means no progressbar
+--len-primer=LEN_PRIMER, -p LEN_PRIMER         Primer length for stats
+--len-linker=LEN_LINKER, -l LEN_LINKER         Linker length to cut out
+--in-compression=<gz|xz|bz2>, -i <gz|xz|bz2>   Specify compression if reading from stdin or a file with unusual suffix
+--out-compression=<gz|xz|bz2>, -o <gz|xz|bz2>  Specify compression if writing to stdout or a file with unusual suffix
+--dry-run, -n                                  Only print what would be done and exit
+
+``python -m bartseq count [<options>] data_dir [library]``
+
+data_dir
+   Data directory to read from. Needs to have the directories “./process/{3-tagged,4-mapped}” filled.
+library
+   Library name. E.g. “Lib1_S1_L001” for input files named “Lib1_S1_L001_R{12}_001.fastq.gz”. Omittable if only one library exists.
+
+--no-mismatch  Ignore barcodes with mismatches while counting.
+--both         Print the count results for both to stdout. Default: Write to “./process/5-counts” instead
+--one          Print the count results for one to stdout. Default: Write to “./process/5-counts” instead
+
+``python -m bartseq browse [<options>] data_dir [library] [out]``
+
+data_dir
+   Data directory to read from. Needs to have the directories “./process/{3-tagged,4-mapped}” filled.
+library
+   Library name. E.g. “Lib1_S1_L001” for input files named “Lib1_S1_L001_R{12}_001.fastq.gz”. Omittable if only one library exists.
+out
+   FASTA file to write to. Supported compression: see --out-compression
+
+--out-compression <gz|xz|bz2>, -o <gz|xz|bz2>  Specify compression if writing to stdout or a file with unusual suffix
+
 Data and statistics
 -------------------
 

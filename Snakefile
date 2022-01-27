@@ -2,6 +2,8 @@
 import sys
 import re
 import json
+import os
+import shutil
 from functools import reduce
 from operator import add
 from pathlib import Path
@@ -140,19 +142,29 @@ rule get_read_count:
 		'process/1-index/{lib_name}.count.txt'
 	shell:
 		'''
-		lines=$(zcat {input:q} | wc -l)
+		lines=$(gzcat {input:q} | wc -l)
 		echo "$lines / 4" | bc > {output:q}
 		'''
 
 rule seqs_by_lib:
 	input:  'in/{seqs_type}/{lib_name}.fa'
 	output: 'process/1-index/{seqs_type}/{lib_name}.fa'
-	shell:  'cp -T {input:q} {output:q}'
+	run:
+		if input == input:
+			input = str(input)
+		if output == output:
+			output = str(output) 
+		shutil.copyfile(input,output)
 
 rule seqs_universal:
 	input:  'in/{seqs_type}.fa'
 	output: 'process/1-index/{seqs_type}/{lib_name}.fa'
-	shell:  'cp -T {input:q} {output:q}'
+	run:
+		if input == input:
+			input = str(input)
+		if output == output:
+			output = str(output) 
+		shutil.copyfile(input,output)
 
 rule trim_quality:
 	input:
@@ -241,7 +253,7 @@ rule map_reads:
 			--new-summary --summary-file {output.summary:q} \
 			-q -U {input.read:q} | \
 			grep -v "^@" - | \
-			cut -f3,10 --output-delimiter='\t' > {output.map:q}
+			gcut -f3,10 --output-delimiter='\t' > {output.map:q}
 		'''
 
 rule count:

@@ -150,20 +150,16 @@ rule seqs_by_lib:
 	input:  'in/{seqs_type}/{lib_name}.fa'
 	output: 'process/1-index/{seqs_type}/{lib_name}.fa'
 	run:
-		if input == input:
-			input = str(input)
-		if output == output:
-			output = str(output) 
+		input = str(input)
+		output = str(output) 
 		shutil.copyfile(input,output)
 
 rule seqs_universal:
 	input:  'in/{seqs_type}.fa'
 	output: 'process/1-index/{seqs_type}/{lib_name}.fa'
 	run:
-		if input == input:
-			input = str(input)
-		if output == output:
-			output = str(output) 
+		input = str(input)
+		output = str(output) 
 		shutil.copyfile(input,output)
 
 rule trim_quality:

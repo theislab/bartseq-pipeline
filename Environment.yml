@@ -1,0 +1,23 @@
+name: snakemake
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - snakemake=6.14.*
+  - snakemake-minimal >=6.14.*
+  - matplotlib
+  - pandas
+  - sickle=0.7.*
+  - hisat2=2.2.*
+  - python=3.6.*
+  - fastqc
+  - ggplot
+  - numpy
+  - pip
+  - pip:
+      - pyahocorasick==1.4.*
+      - plotnine==0.8.*
+      - tqdm==4.62.*
+      - sickle==0.7.*
+      - openpyxl
+prefix: /Users/mervebduman/opt/anaconda3/envs/snakemake

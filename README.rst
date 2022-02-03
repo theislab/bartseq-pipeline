@@ -10,6 +10,19 @@ The primer design code and an older version lives in `theislab/bartSeq <https://
 
 Entry point
 -----------
+- Delete old environment in case there is one
+
+```conda deactivate
+conda env remove -n bartseq_snakemake```
+
+- Build new environment from yml file
+
+```conda env create -f Environment.yml```
+
+Activate the new environment
+
+```conda activate [newenvironmentname]```
+
 The pipeline can be run via ``snakemake [-j 4] [-s …/bartseq/Snakefile] [-d …/mydata]``,
 where ``-j`` specifies the number of threads,
 and the other parameters default to ``./Snakefile`` and ``.``, respectively.
@@ -121,3 +134,14 @@ Possible Problems
 - Amplicon quality bad at the end
 - Trash at the beginning
 - Barcodes can have mismatches
+
+Notes
+~~~~~~~~~~~~~~~~~
+For MacOS, please use Snakefile_for_MacOS.
+
+Contributors
+----------------------
+This repository is forked from theislab/bartseq-pipeline.
+Achim Kramer Lab provided the Environment.yml and Snakefile_for_MacOS.
+- Bert Maier, Environment.yml 
+- Merve Busra Duman, Snakefile_for_MacOS
